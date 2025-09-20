@@ -1,0 +1,18 @@
+# Core dependencies
+python-telegram-bot==20.7
+asyncio-mqtt==0.16.1
+
+# AgentryLab integration
+# Note: This will be installed from the local AgentryLab project
+# pip install -e ../agentrylab
+
+# Development dependencies
+pytest==8.4.2
+pytest-asyncio==0.23.2
+black==24.4.2
+flake8==7.0.0
+mypy==1.8.0
+
+# Optional: For enhanced features
+redis==5.0.1  # For conversation state persistence
+python-dotenv==1.0.0  # For environment variable management
