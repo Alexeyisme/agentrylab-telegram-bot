@@ -4,6 +4,9 @@ FROM python:3.12-slim
 # Set working directory
 WORKDIR /app
 
+# Ensure root project directory is on Python path (so /app/config.py is importable)
+ENV PYTHONPATH=/app
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
