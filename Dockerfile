@@ -21,6 +21,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Ensure a config.py exists in image (copy from example if missing)
+RUN if [ ! -f /app/config.py ]; then cp /app/config.example.py /app/config.py; fi
+
 # Create non-root user for security
 RUN useradd -m -u 1000 botuser && chown -R botuser:botuser /app
 USER botuser
