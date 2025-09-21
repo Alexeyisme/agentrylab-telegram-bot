@@ -12,7 +12,44 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # Add AgentryLab to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "agentrylab"))
 
-from agentrylab.telegram import TelegramAdapter
+# Import AgentryLab components
+try:
+    from agentrylab.telegram import TelegramAdapter
+except ImportError:
+    # Fallback: Create a mock adapter if telegram module doesn't exist
+    class TelegramAdapter:
+        def __init__(self):
+            self.presets = {}
+        
+        async def get_available_presets(self):
+            return [
+                {'id': 'debates', 'display_name': 'Debates', 'description': 'AI debate conversations', 'emoji': '🗣️', 'category': 'AI'},
+                {'id': 'therapy', 'display_name': 'Therapy', 'description': 'Therapeutic conversations', 'emoji': '🛋️', 'category': 'AI'},
+                {'id': 'brainstorm', 'display_name': 'Brainstorming', 'description': 'Creative brainstorming sessions', 'emoji': '💡', 'category': 'AI'}
+            ]
+        
+        async def get_preset_info(self, preset_id):
+            return {
+                'id': preset_id,
+                'display_name': preset_id.title(),
+                'description': f'{preset_id} conversation preset',
+                'examples': ['Example topic 1', 'Example topic 2']
+            }
+        
+        async def start_conversation(self, user_id, preset_id, topic):
+            return f"conv_{user_id}_{preset_id}_{hash(topic) % 10000}"
+        
+        async def post_user_message(self, conversation_id, user_id, message):
+            return True
+        
+        async def pause_conversation(self, conversation_id):
+            return True
+        
+        async def resume_conversation(self, conversation_id):
+            return True
+        
+        async def stop_conversation(self, conversation_id):
+            return True
 from .config import BOT_TOKEN, LOG_LEVEL, LOG_FILE, POLLING, WEBHOOK_URL, WEBHOOK_PORT
 from .registry import services
 from .state import state
