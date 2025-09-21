@@ -5,9 +5,13 @@ Simplified main application entry point.
 import asyncio
 import logging
 import sys
+import os
 
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from agentrylab.telegram import TelegramAdapter
+
+# Ensure current directory is in Python path
+sys.path.append(os.path.dirname(__file__))
 from config import BOT_TOKEN, LOG_LEVEL, LOG_FILE, POLLING, WEBHOOK_URL, WEBHOOK_PORT
 from registry import services
 from state import state
