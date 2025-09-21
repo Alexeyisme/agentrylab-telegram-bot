@@ -61,7 +61,7 @@ Key environment variables:
 ```bash
 BOT_TOKEN=your_bot_token_here
 BOT_USERNAME=your_bot_username
-AGENTRYLAB_PATH=/path/to/agentrylab
+AGENTRYLAB_PATH=/app/agentrylab
 ```
 
 ## Testing

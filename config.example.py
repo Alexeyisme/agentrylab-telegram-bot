@@ -12,8 +12,8 @@ BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"  # Get from @BotFather
 BOT_USERNAME = "your_bot_username"  # Without @
 
 # AgentryLab Configuration
-AGENTRYLAB_PATH = "../agentrylab"  # Path to AgentryLab project
-AGENTRYLAB_PRESETS_PATH = "../agentrylab/presets"  # Path to presets directory
+AGENTRYLAB_PATH = "/app/agentrylab"  # Path to AgentryLab project
+AGENTRYLAB_PRESETS_PATH = "/app/agentrylab/presets"  # Path to presets directory
 
 # Server Configuration
 WEBHOOK_URL = "https://your-domain.com/webhook"  # For production

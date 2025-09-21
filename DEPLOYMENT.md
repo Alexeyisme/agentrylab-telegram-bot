@@ -21,27 +21,30 @@ sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-
 sudo chmod +x /usr/local/bin/docker-compose
 ```
 
-### 3. Deploy Bot
+### 3. Create Application Directory
 ```bash
+sudo mkdir -p /app
+cd /app
+```
+
+### 4. Clone Both Repositories
+```bash
+# Clone AgentryLab
+git clone https://github.com/Alexeyisme/agentrylab.git
+
+# Clone Telegram Bot
 git clone https://github.com/Alexeyisme/agentrylab-telegram-bot.git
 cd agentrylab-telegram-bot
 cp env.example .env
 nano .env  # Edit with your bot token
+```
+
+### 5. Deploy Bot
+```bash
 ./deploy.sh
 ```
 
-### 4. Configure AgentryLab
-```bash
-# Option 1: Clone AgentryLab to the expected path
-sudo mkdir -p /app
-cd /app
-git clone https://github.com/Alexeyisme/agentrylab.git
-
-# Option 2: Or update the .env file to point to your AgentryLab location
-# Edit .env and set: AGENTRYLAB_PATH=/path/to/your/agentrylab
-```
-
-### 5. Test
+### 6. Test
 ```bash
 docker-compose logs -f agentrybot
 ```
@@ -55,6 +58,16 @@ Edit `.env` file:
 BOT_TOKEN=your_telegram_bot_token_here
 BOT_USERNAME=your_bot_username
 AGENTRYLAB_PATH=/app/agentrylab
+```
+
+**Directory Structure:**
+```
+/app/
+├── agentrylab/                    # AgentryLab core
+└── agentrylab-telegram-bot/       # Telegram bot
+    ├── .env                       # Configuration
+    ├── docker-compose.yml         # Deployment
+    └── ...
 ```
 
 ## Common Commands

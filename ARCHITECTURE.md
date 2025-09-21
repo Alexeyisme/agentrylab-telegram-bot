@@ -87,7 +87,7 @@ WELCOME_MSG = "🤖 Welcome to AgentryLab!"
 ```bash
 BOT_TOKEN=your_telegram_bot_token
 BOT_USERNAME=your_bot_username
-AGENTRYLAB_PATH=/path/to/agentrylab
+AGENTRYLAB_PATH=/app/agentrylab
 LOG_LEVEL=INFO
 POLLING=true
 ```
