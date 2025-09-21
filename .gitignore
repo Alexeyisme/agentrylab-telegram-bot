@@ -47,7 +47,7 @@ ehthumbs.db
 Thumbs.db
 
 # Bot specific
-config.py
+/config.py
 bot.log
 *.log
 
