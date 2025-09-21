@@ -6,12 +6,12 @@ asyncio-mqtt==0.16.1
 agentrylab>=0.1.6
 
 # Development dependencies
-pytest==8.4.2
-pytest-asyncio==0.23.2
-black==24.4.2
-flake8==7.0.0
-mypy==1.8.0
+pytest>=8.4.2
+pytest-asyncio>=0.23.2
+black>=24.4.2
+flake8>=7.0.0
+mypy>=1.8.0
 
 # Optional: For enhanced features
-redis==5.0.1  # For conversation state persistence
-python-dotenv==1.0.0  # For environment variable management
+redis>=5.0.1  # For conversation state persistence
+python-dotenv>=1.0.1  # For environment variable management
