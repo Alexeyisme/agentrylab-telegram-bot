@@ -14,7 +14,6 @@ services:
       
       # Logging
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - LOG_FILE=${LOG_FILE:-/app/logs/bot.log}
       
       # Deployment Mode
       - POLLING=${POLLING:-true}
@@ -24,9 +23,7 @@ services:
       # Security
       - PYTHONUNBUFFERED=1
     volumes:
-      # Persist logs
-      - ./logs:/app/logs
-      # Persist conversation data
+      # Persist conversation data (optional)
       - ./data:/app/data
     ports:
       # Webhook port (only if using webhook mode)
