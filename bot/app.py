@@ -10,8 +10,10 @@ import os
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from agentrylab.telegram import TelegramAdapter
 
-# Ensure current directory is in Python path
-sys.path.append(os.path.dirname(__file__))
+# Ensure current and parent directories are in Python path
+current_dir = os.path.dirname(__file__)
+sys.path.append(current_dir)
+sys.path.append(os.path.abspath(os.path.join(current_dir, os.pardir)))
 from config import BOT_TOKEN, LOG_LEVEL, LOG_FILE, POLLING, WEBHOOK_URL, WEBHOOK_PORT
 from registry import services
 from state import state
