@@ -110,6 +110,7 @@ class UserConversationState:
         """Check if the user can start a new conversation."""
         return self.state in {
             ConversationState.IDLE,
+            ConversationState.ENTERING_TOPIC,
             ConversationState.CONVERSATION_ENDED,
             ConversationState.ERROR
         }
