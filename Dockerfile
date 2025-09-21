@@ -36,5 +36,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import sys; sys.exit(0)"
 
 # Run the bot from the bot directory
-WORKDIR /app/bot
-CMD ["python", "main.py"]
+WORKDIR /app
+CMD ["python", "-m", "bot.main"]

@@ -15,9 +15,9 @@ current_dir = os.path.dirname(__file__)
 sys.path.append(current_dir)
 sys.path.append(os.path.abspath(os.path.join(current_dir, os.pardir)))
 from config import BOT_TOKEN, LOG_LEVEL, LOG_FILE, POLLING, WEBHOOK_URL, WEBHOOK_PORT
-from registry import services
-from state import state
-from handlers import commands, callbacks, messages
+from .registry import services
+from .state import state
+from .handlers import commands, callbacks, messages
 
 # Configure logging
 logging.basicConfig(
