@@ -1,42 +1,61 @@
-"""Runtime patches to smooth over AgentryLab API differences."""
+"""Extended Telegram adapter with robust streaming support."""
 
 from __future__ import annotations
 
 import asyncio
-from typing import Any, AsyncIterator
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, AsyncIterator, Dict, Optional
 
 from agentrylab.telegram.adapter import TelegramAdapter
 from agentrylab.telegram.models import ConversationEvent, ConversationStatus
 
+_SENTINEL = object()
 
-def _ensure_async_iter(stream: Any) -> AsyncIterator[Any]:
-    """Return an async iterator for both sync and async streams."""
 
-    if hasattr(stream, "__aiter__"):
-        return stream  # type: ignore[return-value]
+class AsyncTelegramAdapter(TelegramAdapter):
+    """TelegramAdapter variant that tolerates sync Lab.stream generators."""
 
-    iterator = iter(stream)
+    def __init__(self, *args: Any, max_workers: int = 4, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._stream_executor = ThreadPoolExecutor(
+            max_workers=max_workers,
+            thread_name_prefix="agentrylab-stream",
+        )
+        self._stream_futures: Dict[str, Any] = {}
 
-    async def _async_iter() -> AsyncIterator[Any]:
-        while True:
+    async def _iterate_lab_stream(
+        self,
+        conversation_id: str,
+        lab: Any,
+        max_rounds: int,
+    ) -> AsyncIterator[Dict[str, Any]]:
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[Any] = asyncio.Queue()
+
+        def producer() -> None:
             try:
-                item = await asyncio.to_thread(next, iterator)
-            except StopIteration:
-                break
-            yield item
+                for event in lab.stream(rounds=max_rounds):
+                    asyncio.run_coroutine_threadsafe(queue.put(event), loop).result()
+            except Exception as exc:  # pragma: no cover - defensive
+                asyncio.run_coroutine_threadsafe(queue.put(exc), loop).result()
+            finally:
+                asyncio.run_coroutine_threadsafe(queue.put(_SENTINEL), loop).result()
 
-    return _async_iter()
+        future = self._stream_executor.submit(producer)
+        self._stream_futures[conversation_id] = future
 
+        try:
+            while True:
+                item = await queue.get()
+                if item is _SENTINEL:
+                    break
+                if isinstance(item, Exception):
+                    raise item
+                yield item
+        finally:
+            self._stream_futures.pop(conversation_id, None)
 
-def patch_telegram_adapter_streaming() -> None:
-    """Patch TelegramAdapter to support sync generators from Lab.stream."""
-
-    if getattr(TelegramAdapter, "_agentrylab_stream_patch_applied", False):
-        return
-
-    original_run = TelegramAdapter._run_conversation
-
-    async def _run_conversation(self: TelegramAdapter, conversation_id: str) -> None:  # type: ignore[override]
+    async def _run_conversation(self, conversation_id: str) -> None:  # type: ignore[override]
         try:
             state = self._conversations[conversation_id]
             lab = state.lab_instance
@@ -50,9 +69,7 @@ def patch_telegram_adapter_streaming() -> None:
             )
 
             max_rounds = state.metadata.get("max_rounds", 10)
-            stream = _ensure_async_iter(lab.stream(rounds=max_rounds))
-
-            async for event in stream:
+            async for event in self._iterate_lab_stream(conversation_id, lab, max_rounds):
                 if state.status != ConversationStatus.ACTIVE:
                     break
 
@@ -104,7 +121,8 @@ def patch_telegram_adapter_streaming() -> None:
             state = self._conversations.get(conversation_id)
             if state:
                 state.status = ConversationStatus.STOPPED
-        except Exception as exc:  # pragma: no cover - defensive logging
+            raise
+        except Exception as exc:  # pragma: no cover - defensive
             state = self._conversations.get(conversation_id)
             if state:
                 state.status = ConversationStatus.ERROR
@@ -117,10 +135,19 @@ def patch_telegram_adapter_streaming() -> None:
             if conversation_id in self._running_tasks:
                 del self._running_tasks[conversation_id]
 
-    # Preserve reference to ConversationEvent for convenience
-    _run_conversation.ConversationEvent = TelegramAdapter._emit_event.__globals__[  # type: ignore[attr-defined]
-        "ConversationEvent"
-    ]
+    def stop_conversation(self, conversation_id: str) -> None:
+        super().stop_conversation(conversation_id)
+        future = self._stream_futures.pop(conversation_id, None)
+        if future:
+            future.cancel()
 
-    TelegramAdapter._run_conversation = _run_conversation
-    TelegramAdapter._agentrylab_stream_patch_applied = True
+    def cleanup(self) -> None:
+        """Shut down the executor gracefully."""
+        self._stream_executor.shutdown(wait=False)
+
+    # Ensure executor shuts down if adapter is garbage collected
+    def __del__(self) -> None:  # pragma: no cover - defensive cleanup
+        try:
+            self.cleanup()
+        except Exception:
+            pass

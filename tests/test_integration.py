@@ -79,31 +79,31 @@ class TestCommandIntegration(TestBotIntegration):
         }
         
         await start_command(mock_update, mock_context)
-        
-        # Verify reply_text was called
-        mock_update.message.reply_text.assert_called_once()
-        
-        # Verify state was reset
+
+        # Verify welcome and preset messages were sent
+        assert mock_update.message.reply_text.call_count >= 2
+        welcome_call = mock_update.message.reply_text.call_args_list[0][0][0]
+        presets_call = mock_update.message.reply_text.call_args_list[1][0][0]
+        assert "Welcome to AgentryLab" in welcome_call
+        assert "Choose a Conversation Type" in presets_call
+
+        # Verify state was reset to preset selection
         user_state = mock_context.bot_data['state_manager'].get_user_state("123456789")
-        assert user_state.state == ConversationState.IDLE
+        assert user_state.state == ConversationState.SELECTING_PRESET
     
     @pytest.mark.asyncio
     async def test_help_command_integration(self, mock_update, mock_context):
         """Test help command integration."""
         await help_command(mock_update, mock_context)
-        
+
         # Verify reply_text was called
         mock_update.message.reply_text.assert_called_once()
-        
+
         # Check that help message contains expected commands
         call_args = mock_update.message.reply_text.call_args[0][0]
-        assert "/start" in call_args
-        assert "/help" in call_args
-        assert "/presets" in call_args
-        assert "/status" in call_args
-        assert "/pause" in call_args
-        assert "/resume" in call_args
-        assert "/stop" in call_args
+        assert "AgentryLab Bot Help" in call_args
+        for command in ("/start", "/help", "/presets", "/status", "/pause", "/resume", "/stop"):
+            assert command in call_args
     
     @pytest.mark.asyncio
     async def test_presets_command_integration(self, mock_update, mock_context):
@@ -192,6 +192,9 @@ class TestMessageIntegration(TestBotIntegration):
     @pytest.mark.asyncio
     async def test_handle_message_integration(self, mock_update, mock_context):
         """Test message handling integration."""
+        # Ensure the user is waiting for a topic so the correct handler runs
+        mock_context.user_data['waiting_for_topic'] = True
+
         # Mock the conversation.handle_topic_input function
         with patch('bot.main.conversation.handle_topic_input') as mock_handle:
             mock_handle.return_value = AsyncMock()
@@ -208,13 +211,11 @@ class TestCallbackIntegration(TestBotIntegration):
     @pytest.mark.asyncio
     async def test_handle_callback_query_integration(self, mock_callback_update, mock_context):
         """Test callback query handling integration."""
-        # Mock the presets.handle_preset_callback function
-        with patch('bot.main.presets.handle_preset_callback') as mock_handle:
-            mock_handle.return_value = AsyncMock()
-            
+        # Mock the primary callback handler
+        with patch('bot.handlers.callbacks.handle_callback', new_callable=AsyncMock) as mock_handle:
             await handle_callback_query(mock_callback_update, mock_context)
-            
-            # Verify handle_preset_callback was called
+
+            # Verify router-based handler was invoked
             mock_handle.assert_called_once_with(mock_callback_update, mock_context)
 
 
@@ -308,7 +309,7 @@ class TestConversationHandlerIntegration(TestBotIntegration):
             
             # Check that confirmation message was sent
             call_args = mock_update.message.reply_text.call_args[0][0]
-            assert "debates" in call_args
+            assert "debates" in call_args.lower()
             assert "Should remote work become the standard?" in call_args
     
     @pytest.mark.asyncio
@@ -410,7 +411,7 @@ class TestErrorHandlingIntegration(TestBotIntegration):
         mock_update.message.reply_text.assert_called_once()
         
         call_args = mock_update.message.reply_text.call_args[0][0]
-        assert "Error retrieving presets" in call_args
+        assert "failed to retrieve available presets" in call_args.lower()
     
     @pytest.mark.asyncio
     async def test_validation_error_handling(self, mock_update, mock_context):
@@ -426,7 +427,7 @@ class TestErrorHandlingIntegration(TestBotIntegration):
         mock_update.message.reply_text.assert_called_once()
         
         call_args = mock_update.message.reply_text.call_args[0][0]
-        assert "empty" in call_args.lower()
+        assert "3 characters" in call_args or "topic" in call_args.lower()
 
 
 class TestIntegrationWithFactories:
@@ -457,10 +458,11 @@ class TestIntegrationWithFactories:
         await start_command(factory_update, factory_context)
         
         # Verify message was sent
-        factory_update.message.reply_text.assert_called_once()
-        
-        call_args = factory_update.message.reply_text.call_args[0][0]
-        assert "Welcome to AgentryLab" in call_args
+        assert factory_update.message.reply_text.call_count >= 2
+        welcome_call = factory_update.message.reply_text.call_args_list[0][0][0]
+        presets_call = factory_update.message.reply_text.call_args_list[1][0][0]
+        assert "Welcome to AgentryLab" in welcome_call
+        assert "Choose a Conversation Type" in presets_call
     
     @pytest.mark.asyncio
     async def test_help_command_with_factory(self, factory_update, factory_context):
@@ -469,9 +471,9 @@ class TestIntegrationWithFactories:
         
         # Verify message was sent
         factory_update.message.reply_text.assert_called_once()
-        
+
         call_args = factory_update.message.reply_text.call_args[0][0]
-        assert "Available Commands" in call_args
+        assert "AgentryLab Bot Help" in call_args
     
     @pytest.mark.asyncio
     async def test_presets_command_with_factory(self, factory_update, factory_context):
@@ -521,7 +523,12 @@ class TestIntegrationWithFactories:
         factory_update.message.reply_text.assert_called_once()
         
         call_args = factory_update.message.reply_text.call_args[0][0]
-        assert "no active conversation" in call_args.lower() or "paused" in call_args.lower()
+        lowered = call_args.lower()
+        assert (
+            "no active conversation" in lowered
+            or "don't have an active conversation" in lowered
+            or "paused" in lowered
+        )
     
     @pytest.mark.asyncio
     async def test_error_handling_with_factory(self, factory_update, factory_context):

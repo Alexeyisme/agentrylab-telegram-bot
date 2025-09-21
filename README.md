@@ -33,7 +33,7 @@ source venv/bin/activate
 ### Configuration
 ```bash
 cp env.example .env
-# Edit .env with your bot token and settings
+# Edit .env with your bot token and settings (OPENAI_API_KEY is required)
 ```
 
 ### Run
@@ -52,6 +52,9 @@ docker-compose up -d
 
 # Or use the deployment script
 ./deploy.sh
+
+# Confirm the OpenAI credentials made it into the container
+docker-compose exec agentrybot printenv | grep OPENAI
 ```
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
@@ -63,6 +66,8 @@ Key environment variables:
 BOT_TOKEN=your_bot_token_here
 BOT_USERNAME=your_bot_username
 OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_ORGANIZATION=your_openai_organization_id  # optional
+AGENTRYLAB_PRESETS_PATH=/path/to/custom/presets   # optional
 ```
 
 ## Testing

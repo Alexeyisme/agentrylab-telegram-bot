@@ -8,17 +8,16 @@ import sys
 import os
 
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
-from agentrylab.telegram import TelegramAdapter
 
 # Ensure current and parent directories are in Python path
 current_dir = os.path.dirname(__file__)
 sys.path.append(current_dir)
 sys.path.append(os.path.abspath(os.path.join(current_dir, os.pardir)))
 from config import BOT_TOKEN, LOG_LEVEL, LOG_FILE, POLLING, WEBHOOK_URL, WEBHOOK_PORT
+from .adapters import AsyncTelegramAdapter
 from .registry import services
 from .states.conversation import ConversationStateManager
 from .handlers import commands, callbacks, messages, presets, conversation
-from .utils.agentrylab_patches import patch_telegram_adapter_streaming
 from .handlers import callback_router
 
 # Configure logging
@@ -36,8 +35,7 @@ def main() -> None:
     
     # Initialize AgentryLab adapter
     try:
-        patch_telegram_adapter_streaming()
-        adapter = TelegramAdapter()
+        adapter = AsyncTelegramAdapter()
         logger.info("AgentryLab adapter initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize AgentryLab adapter: {e}")

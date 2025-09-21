@@ -33,12 +33,15 @@ cd /app
 git clone https://github.com/Alexeyisme/agentrylab-telegram-bot.git
 cd agentrylab-telegram-bot
 cp env.example .env
-nano .env  # Edit with your bot token
+nano .env  # Edit with your bot token and OPENAI_API_KEY
 ```
 
 ### 5. Deploy Bot
 ```bash
 ./deploy.sh
+
+# Confirm credentials made it into the container
+docker-compose exec agentrybot printenv | grep OPENAI
 ```
 
 ### 6. Test
@@ -55,6 +58,8 @@ Edit `.env` file:
 BOT_TOKEN=your_telegram_bot_token_here
 BOT_USERNAME=your_bot_username
 OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_ORGANIZATION=your_openai_organization_id  # optional
+AGENTRYLAB_PRESETS_PATH=/path/to/custom/presets   # optional
 ```
 
 **Directory Structure:**
