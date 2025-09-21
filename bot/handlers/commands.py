@@ -8,7 +8,7 @@ from telegram.ext import ContextTypes
 
 from ..config import WELCOME_MSG, HELP_MSG, NO_CONVERSATION_MSG
 from ..services import services
-from ..state import state
+from ..constants import ConversationStates
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     user_name = update.effective_user.first_name or "User"
     
     # Clear any existing state
-    state.clear_user_state(user_id)
+    services.state_manager.reset_user_state(user_id)
     
     # Send welcome message
     await update.message.reply_text(
@@ -39,16 +39,16 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /status command."""
     user_id = str(update.effective_user.id)
-    user_state = state.get_user_state(user_id)
+    user_state = services.state_manager.get_user_state(user_id)
     
-    if not state.is_user_in_conversation(user_id):
+    if not services.state_manager.is_user_in_conversation(user_id):
         await update.message.reply_text(NO_CONVERSATION_MSG)
         return
     
     status_msg = f"📊 **Your Status**\n\n"
-    status_msg += f"**State:** {user_state.state}\n"
-    status_msg += f"**Preset:** {user_state.preset_id}\n"
-    status_msg += f"**Topic:** {user_state.topic}\n"
+    status_msg += f"**State:** {user_state.state.value}\n"
+    status_msg += f"**Preset:** {user_state.selected_preset}\n"
+    status_msg += f"**Topic:** {user_state.selected_topic}\n"
     
     await update.message.reply_text(status_msg, parse_mode='Markdown')
 

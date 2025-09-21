@@ -6,9 +6,9 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from ..config import MAX_TOPIC_LENGTH, STATE_WAITING_TOPIC, STATE_ACTIVE
+from ..config import MAX_TOPIC_LENGTH
 from ..services import services
-from ..state import state
+from ..constants import ConversationStates
 
 logger = logging.getLogger(__name__)
 
@@ -17,13 +17,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     """Handle incoming messages."""
     user_id = str(update.effective_user.id)
     message_text = update.message.text.strip()
-    user_state = state.get_user_state(user_id)
+    user_state = services.state_manager.get_user_state(user_id)
     
     # Handle topic input
-    if user_state.state == STATE_WAITING_TOPIC:
+    if user_state.state == ConversationStates.ENTERING_TOPIC:
         await handle_topic_input(update, context, message_text)
     # Handle conversation input
-    elif user_state.state == STATE_ACTIVE:
+    elif user_state.state == ConversationStates.IN_CONVERSATION:
         await handle_conversation_input(update, context, message_text)
     # Handle regular messages
     else:
@@ -33,7 +33,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def handle_topic_input(update: Update, context: ContextTypes.DEFAULT_TYPE, topic: str) -> None:
     """Handle topic input from user."""
     user_id = str(update.effective_user.id)
-    user_state = state.get_user_state(user_id)
+    user_state = services.state_manager.get_user_state(user_id)
     
     # Validate topic
     if len(topic) > MAX_TOPIC_LENGTH:
@@ -50,17 +50,12 @@ async def handle_topic_input(update: Update, context: ContextTypes.DEFAULT_TYPE,
     try:
         conversation_service = services.get_conversation_service()
         conversation_id = await conversation_service.start_conversation(
-            user_id, user_state.preset_id, topic
+            user_id, user_state.selected_preset, topic
         )
-        
-        # Update user state
-        state.set_user_state(user_id, STATE_ACTIVE,
-                           conversation_id=conversation_id,
-                           topic=topic)
         
         await update.message.reply_text(
             f"🚀 **Conversation Started!**\n\n"
-            f"Preset: {user_state.preset_id}\n"
+            f"Preset: {user_state.selected_preset}\n"
             f"Topic: {topic}\n\n"
             f"Watch the agents interact in real-time!",
             parse_mode='Markdown'
@@ -74,7 +69,7 @@ async def handle_topic_input(update: Update, context: ContextTypes.DEFAULT_TYPE,
 async def handle_conversation_input(update: Update, context: ContextTypes.DEFAULT_TYPE, message: str) -> None:
     """Handle user input during conversation."""
     user_id = str(update.effective_user.id)
-    user_state = state.get_user_state(user_id)
+    user_state = services.state_manager.get_user_state(user_id)
     
     if not user_state.conversation_id:
         await update.message.reply_text("❌ No active conversation found.")

@@ -8,7 +8,7 @@ from telegram.ext import ContextTypes
 
 from ..config import PREFIX_SELECT, PREFIX_INFO, PREFIX_EXAMPLES, PREFIX_CUSTOM, PREFIX_CONFIRM
 from ..services import services
-from ..state import state
+from ..constants import ConversationStates
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,8 @@ async def handle_preset_selection(query: CallbackQuery, context: ContextTypes.DE
     user_id = str(query.from_user.id)
     
     # Store selected preset
-    state.set_user_state(user_id, "waiting_topic", preset_id=preset_id)
+    services.state_manager.set_user_preset(user_id, preset_id)
+    services.state_manager.set_user_state(user_id, ConversationStates.ENTERING_TOPIC)
     
     # Ask for topic
     await query.edit_message_text(
@@ -101,7 +102,8 @@ async def handle_custom_topic(query: CallbackQuery, context: ContextTypes.DEFAUL
     user_id = str(query.from_user.id)
     
     # Store selected preset
-    state.set_user_state(user_id, "waiting_topic", preset_id=preset_id)
+    services.state_manager.set_user_preset(user_id, preset_id)
+    services.state_manager.set_user_state(user_id, ConversationStates.ENTERING_TOPIC)
     
     # Ask for topic
     await query.edit_message_text(
@@ -129,10 +131,8 @@ async def handle_topic_confirmation(query: CallbackQuery, context: ContextTypes.
         conversation_id = await conversation_service.start_conversation(user_id, preset_id, topic)
         
         # Update user state
-        state.set_user_state(user_id, "active", 
-                           conversation_id=conversation_id, 
-                           preset_id=preset_id, 
-                           topic=topic)
+        services.state_manager.set_user_conversation_id(user_id, conversation_id)
+        services.state_manager.set_user_state(user_id, ConversationStates.IN_CONVERSATION)
         
         await query.edit_message_text(
             f"🚀 **Conversation Started!**\n\n"

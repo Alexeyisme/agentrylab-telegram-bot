@@ -16,7 +16,7 @@ sys.path.append(current_dir)
 sys.path.append(os.path.abspath(os.path.join(current_dir, os.pardir)))
 from config import BOT_TOKEN, LOG_LEVEL, LOG_FILE, POLLING, WEBHOOK_URL, WEBHOOK_PORT
 from .registry import services
-from .state import state
+from .states.conversation import ConversationStateManager
 from .handlers import commands, callbacks, messages
 
 # Configure logging
@@ -41,7 +41,8 @@ def main() -> None:
         sys.exit(1)
     
     # Initialize services
-    services.initialize(adapter, state)
+    state_manager = ConversationStateManager()
+    services.initialize(adapter, state_manager)
     
     # Create application
     application = Application.builder().token(BOT_TOKEN).build()
