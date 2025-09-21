@@ -20,6 +20,7 @@ A Telegram bot that provides access to AgentryLab's multi-agent conversations th
 - Python 3.8+
 - AgentryLab instance
 - Telegram bot token from [@BotFather](https://t.me/BotFather)
+- OpenAI API key for GPT models
 
 ### Installation
 ```bash
@@ -61,7 +62,7 @@ Key environment variables:
 ```bash
 BOT_TOKEN=your_bot_token_here
 BOT_USERNAME=your_bot_username
-AGENTRYLAB_PATH=/app/agentrylab
+OPENAI_API_KEY=your_openai_api_key_here
 ```
 
 ## Testing

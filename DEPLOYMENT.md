@@ -54,6 +54,7 @@ Edit `.env` file:
 ```bash
 BOT_TOKEN=your_telegram_bot_token_here
 BOT_USERNAME=your_bot_username
+OPENAI_API_KEY=your_openai_api_key_here
 ```
 
 **Directory Structure:**
