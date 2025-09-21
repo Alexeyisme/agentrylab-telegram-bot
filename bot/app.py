@@ -4,14 +4,8 @@ Simplified main application entry point.
 
 import asyncio
 import logging
-import sys
-from pathlib import Path
 
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
-
-# Add AgentryLab to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "agentrylab"))
-
 from agentrylab.telegram import TelegramAdapter
 from .config import BOT_TOKEN, LOG_LEVEL, LOG_FILE, POLLING, WEBHOOK_URL, WEBHOOK_PORT
 from .registry import services

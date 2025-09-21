@@ -6,20 +6,13 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    git \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Clone and install AgentryLab
-RUN git clone https://github.com/Alexeyisme/agentrylab.git /app/agentrylab
-WORKDIR /app/agentrylab
-RUN pip install --no-cache-dir -e .
-
 # Copy requirements first (for better caching)
-WORKDIR /app
 COPY requirements.txt .
 
-# Install Python dependencies
+# Install Python dependencies including AgentryLab from PyPI
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code

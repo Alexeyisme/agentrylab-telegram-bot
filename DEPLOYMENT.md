@@ -27,11 +27,8 @@ sudo mkdir -p /app
 cd /app
 ```
 
-### 4. Clone Both Repositories
+### 4. Clone Telegram Bot Repository
 ```bash
-# Clone AgentryLab
-git clone https://github.com/Alexeyisme/agentrylab.git
-
 # Clone Telegram Bot
 git clone https://github.com/Alexeyisme/agentrylab-telegram-bot.git
 cd agentrylab-telegram-bot
@@ -57,18 +54,18 @@ Edit `.env` file:
 ```bash
 BOT_TOKEN=your_telegram_bot_token_here
 BOT_USERNAME=your_bot_username
-AGENTRYLAB_PATH=/app/agentrylab
 ```
 
 **Directory Structure:**
 ```
 /app/
-├── agentrylab/                    # AgentryLab core
 └── agentrylab-telegram-bot/       # Telegram bot
     ├── .env                       # Configuration
     ├── docker-compose.yml         # Deployment
     └── ...
 ```
+
+**Note:** AgentryLab is now installed from PyPI (v0.1.6+) as a Python package, no need for separate cloning.
 
 ## Common Commands
 
@@ -105,17 +102,14 @@ cat .env
 sudo chown -R $USER:$USER .
 ```
 
-### AgentryLab Path Issues
+### AgentryLab Import Issues
 ```bash
-# Check if AgentryLab is accessible
-ls -la /app/agentrylab
+# Check if AgentryLab is installed
+docker-compose exec agentrybot python -c "import agentrylab; print(agentrylab.__version__)"
 
-# If not found, check your .env file
-cat .env | grep AGENTRYLAB_PATH
-
-# Update the path if needed
-nano .env
-# Set AGENTRYLAB_PATH=/correct/path/to/agentrylab
+# If import fails, rebuild the container
+docker-compose down
+docker-compose up -d --build
 ```
 
 ## Security (Optional)
