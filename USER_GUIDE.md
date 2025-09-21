@@ -4,8 +4,8 @@
 
 ### 1. Find Your Bot
 - Open Telegram
-- Search for your bot username (the one you set in `BOT_USERNAME`)
-- Or use the direct link: `https://t.me/YOUR_BOT_USERNAME`
+- Search for `@agentrylab_bot`
+- Or use the direct link: `https://t.me/agentrylab_bot`
 
 ### 2. Start the Bot
 Send `/start` to begin your conversation with the bot.
