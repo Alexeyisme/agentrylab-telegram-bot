@@ -425,6 +425,7 @@ class ConversationService:
             
             # Clean up streaming tasks for inactive conversations
             current_time = datetime.now(timezone.utc)
+            from datetime import timedelta
             cutoff_time = current_time - timedelta(hours=max_age_hours)
             
             inactive_tasks = []

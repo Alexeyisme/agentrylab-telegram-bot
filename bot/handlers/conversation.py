@@ -9,7 +9,17 @@ from typing import Optional
 from telegram import Update, Message
 from telegram.ext import ContextTypes
 
+from ..constants import Messages, ConversationStates
+from ..keyboards.presets import create_topic_confirmation_keyboard
+from ..services.conversation_service import ConversationService
+from ..services.preset_service import PresetService
 from ..states.conversation import ConversationState, ConversationStateManager
+from ..templates.messages import MessageTemplates
+from ..utils.context_helpers import (
+    get_user_id, get_user_data, set_user_data, clear_user_data,
+    is_user_waiting_for_topic, get_selected_preset, get_selected_topic
+)
+from ..utils.error_handling import handle_errors
 from ..utils.validation import validate_topic_input
 
 logger = logging.getLogger(__name__)
@@ -18,6 +28,7 @@ logger = logging.getLogger(__name__)
 state_manager = ConversationStateManager()
 
 
+@handle_errors("Error processing your topic. Please try again.")
 async def handle_topic_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handle topic input from users.
@@ -26,76 +37,70 @@ async def handle_topic_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         update: Telegram update object
         context: Bot context
     """
-    user_id = str(update.effective_user.id)
+    user_id = get_user_id(update)
     message_text = update.message.text.strip()
     
-    try:
-        # Check if user is waiting for topic input
-        if not context.user_data.get('waiting_for_topic', False):
-            # User is not in topic input mode, handle as regular message
-            await handle_regular_message(update, context)
-            return
-        
-        # Validate topic input
-        validation_result = validate_topic_input(message_text)
-        if not validation_result['valid']:
-            await update.message.reply_text(
-                f"❌ {validation_result['error']}\n\n"
-                "Please enter a valid topic. For example:\n"
-                "• Should remote work become the standard?\n"
-                "• How to improve team productivity?\n"
-                "• The future of artificial intelligence"
-            )
-            return
-        
-        # Get selected preset
-        preset_id = context.user_data.get('selected_preset')
-        if not preset_id:
-            await update.message.reply_text(
-                "❌ No preset selected. Please start over with /start"
-            )
-            return
-        
-        # Store topic and show confirmation
-        context.user_data['selected_topic'] = message_text
-        
-        # Create confirmation message
-        from ..keyboards.presets import (
-            create_topic_confirmation_keyboard,
-            get_preset_display_name,
-            get_preset_emoji
-        )
-        
-        display_name = get_preset_display_name(preset_id)
-        emoji = get_preset_emoji(preset_id)
-        
-        message = f"{emoji} **{display_name}**\n\n"
-        message += f"**Topic:** {message_text}\n\n"
-        message += "Ready to start the conversation? Click below to begin!"
-        
-        keyboard = create_topic_confirmation_keyboard(preset_id, message_text)
-        
+    # Check if user is waiting for topic input using new utility
+    if not is_user_waiting_for_topic(update, context):
+        # User is not in topic input mode, handle as regular message
+        await handle_regular_message(update, context)
+        return
+    
+    # Validate topic input
+    validation_result = validate_topic_input(message_text)
+    if not validation_result['valid']:
+        error_message = MessageTemplates.topic_validation_error(validation_result.get('error_type', 'general'))
         await update.message.reply_text(
-            message,
-            parse_mode='Markdown',
-            reply_markup=keyboard
+            f"❌ {error_message}\n\n"
+            "Please enter a valid topic. For example:\n"
+            "• Should remote work become the standard?\n"
+            "• How to improve team productivity?\n"
+            "• The future of artificial intelligence"
         )
-        
-        # Clear waiting state
-        context.user_data.pop('waiting_for_topic', None)
-        
-        # Update user state
-        state_manager.set_user_state(user_id, ConversationState.CONFIRMING_TOPIC)
-        state_manager.set_user_preset(user_id, preset_id)
-        state_manager.set_user_topic(user_id, message_text)
-        
-    except Exception as e:
-        logger.error(f"Error handling topic input: {e}")
-        await update.message.reply_text(
-            "❌ Error processing your topic. Please try again."
-        )
+        return
+    
+    # Get selected preset using new utility
+    preset_id = get_selected_preset(update, context)
+    if not preset_id:
+        await update.message.reply_text(Messages.NO_PRESET_SELECTED)
+        return
+    
+    # Store topic using new utility
+    set_user_data(update, context, 'selected_topic', message_text)
+    
+    # Get adapter and create services
+    from ..utils.context_helpers import require_adapter
+    adapter = await require_adapter(update, context)
+    preset_service = PresetService(adapter)
+    
+    # Get preset information using service
+    preset_info = await preset_service.get_preset_info(preset_id)
+    
+    # Create confirmation message using template
+    message = MessageTemplates.topic_confirmation_message(
+        emoji=preset_info['emoji'],
+        display_name=preset_info['display_name'],
+        topic=message_text
+    )
+    
+    keyboard = create_topic_confirmation_keyboard(preset_id, message_text)
+    
+    await update.message.reply_text(
+        message,
+        parse_mode='Markdown',
+        reply_markup=keyboard
+    )
+    
+    # Clear waiting state using new utility
+    set_user_data(update, context, 'waiting_for_topic', False)
+    
+    # Update user state
+    state_manager.set_user_state(user_id, ConversationState.CONFIRMING_TOPIC)
+    state_manager.set_user_preset(user_id, preset_id)
+    state_manager.set_user_topic(user_id, message_text)
 
 
+@handle_errors("Error processing your message. Please try again.")
 async def handle_regular_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handle regular messages from users.
@@ -104,33 +109,22 @@ async def handle_regular_message(update: Update, context: ContextTypes.DEFAULT_T
         update: Telegram update object
         context: Bot context
     """
-    user_id = str(update.effective_user.id)
-    message_text = update.message.text.strip()
+    user_id = get_user_id(update)
     
-    try:
-        # Check if user is in a conversation
-        if state_manager.is_user_in_conversation(user_id):
-            # User is in conversation, handle as conversation input
-            await handle_conversation_input(update, context)
-            return
-        
-        # User is not in conversation, provide help
-        await update.message.reply_text(
-            "🤖 **Hello!** I'm your AgentryLab assistant.\n\n"
-            "To get started, use one of these commands:\n"
-            "• /start - Start a new conversation\n"
-            "• /presets - See available conversation types\n"
-            "• /help - Get help and see all commands\n\n"
-            "Or just type /start to begin!"
-        )
-        
-    except Exception as e:
-        logger.error(f"Error handling regular message: {e}")
-        await update.message.reply_text(
-            "❌ Error processing your message. Please try again."
-        )
+    # Check if user is in a conversation
+    if state_manager.is_user_in_conversation(user_id):
+        # User is in conversation, handle as conversation input
+        await handle_conversation_input(update, context)
+        return
+    
+    # User is not in conversation, provide help using template
+    await update.message.reply_text(
+        MessageTemplates.regular_message_response(),
+        parse_mode='Markdown'
+    )
 
 
+@handle_errors("Error processing your input. Please try again.")
 async def handle_conversation_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handle user input during an active conversation.
@@ -139,64 +133,55 @@ async def handle_conversation_input(update: Update, context: ContextTypes.DEFAUL
         update: Telegram update object
         context: Bot context
     """
-    user_id = str(update.effective_user.id)
+    user_id = get_user_id(update)
     message_text = update.message.text.strip()
     
-    try:
-        # Get user state
-        user_state = state_manager.get_user_state(user_id)
-        
-        # Check if user is waiting for input
-        if user_state.state != ConversationState.WAITING_FOR_USER_INPUT:
-            await update.message.reply_text(
-                "⏳ Please wait for your turn to speak in the conversation.\n\n"
-                "The AI agents are currently discussing. You'll be prompted when it's your turn!"
-            )
-            return
-        
-        # Get conversation ID
-        conversation_id = user_state.conversation_id
-        if not conversation_id:
-            await update.message.reply_text(
-                "❌ No active conversation found. Please start a new conversation."
-            )
-            return
-        
-        # Get adapter from context
-        adapter = context.bot_data.get('adapter')
-        if not adapter:
-            await update.message.reply_text(
-                "❌ Bot not properly initialized. Please try again later."
-            )
-            return
-        
-        # Post user message to conversation
-        try:
-            adapter.post_user_message(conversation_id, message_text, user_id=user_id)
-            
-            # Update user state
-            state_manager.set_user_state(user_id, ConversationState.IN_CONVERSATION)
-            
-            # Show confirmation
-            await update.message.reply_text(
-                "✅ **Message sent!**\n\n"
-                "Your input has been added to the conversation. "
-                "The AI agents will continue the discussion."
-            )
-            
-        except Exception as e:
-            logger.error(f"Error posting user message: {e}")
-            await update.message.reply_text(
-                "❌ Error sending your message. Please try again."
-            )
-        
-    except Exception as e:
-        logger.error(f"Error handling conversation input: {e}")
+    # Get user state
+    user_state = state_manager.get_user_state(user_id)
+    
+    # Check if user is waiting for input
+    if user_state.state != ConversationState.WAITING_FOR_USER_INPUT:
         await update.message.reply_text(
-            "❌ Error processing your input. Please try again."
+            MessageTemplates.waiting_for_turn_message(),
+            parse_mode='Markdown'
+        )
+        return
+    
+    # Get conversation ID
+    conversation_id = user_state.conversation_id
+    if not conversation_id:
+        await update.message.reply_text(Messages.NO_CONVERSATION_FOUND)
+        return
+    
+    # Get adapter and create conversation service
+    from ..utils.context_helpers import require_adapter
+    adapter = await require_adapter(update, context)
+    conversation_service = ConversationService(adapter, state_manager)
+    
+    # Handle user input using service
+    try:
+        success = await conversation_service.handle_user_input(user_id, message_text)
+        
+        if success:
+            # Show confirmation using template
+            await update.message.reply_text(
+                MessageTemplates.message_sent_message(),
+                parse_mode='Markdown'
+            )
+        else:
+            await update.message.reply_text(
+                MessageTemplates.waiting_for_turn_message(),
+                parse_mode='Markdown'
+            )
+            
+    except Exception as e:
+        logger.error(f"Error posting user message: {e}")
+        await update.message.reply_text(
+            "❌ Error sending your message. Please try again."
         )
 
 
+@handle_errors("Error starting conversation. Please try again.")
 async def start_conversation_with_agentrylab(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                                            preset_id: str, topic: str) -> Optional[str]:
     """
@@ -211,43 +196,25 @@ async def start_conversation_with_agentrylab(update: Update, context: ContextTyp
     Returns:
         Conversation ID if successful, None otherwise
     """
-    user_id = str(update.effective_user.id)
+    user_id = get_user_id(update)
     
-    try:
-        # Get adapter from context
-        adapter = context.bot_data.get('adapter')
-        if not adapter:
-            await update.message.reply_text(
-                "❌ Bot not properly initialized. Please try again later."
-            )
-            return None
-        
-        # Update user state
-        state_manager.set_user_state(user_id, ConversationState.STARTING_CONVERSATION)
-        
-        # Start conversation with AgentryLab
-        conversation_id = adapter.start_conversation(
-            preset_id=preset_id,
-            topic=topic,
-            user_id=user_id
-        )
-        
-        # Update user state with conversation ID
-        state_manager.set_user_conversation_id(user_id, conversation_id)
-        state_manager.set_user_state(user_id, ConversationState.IN_CONVERSATION)
-        
-        # Start conversation streaming task
-        asyncio.create_task(stream_conversation_events(update, context, conversation_id))
-        
-        return conversation_id
-        
-    except Exception as e:
-        logger.error(f"Error starting conversation: {e}")
-        state_manager.set_user_state(user_id, ConversationState.ERROR)
-        await update.message.reply_text(
-            "❌ Error starting conversation. Please try again."
-        )
-        return None
+    # Get adapter and create conversation service
+    from ..utils.context_helpers import require_adapter
+    adapter = await require_adapter(update, context)
+    conversation_service = ConversationService(adapter, state_manager)
+    
+    # Start conversation using service
+    conversation_id = await conversation_service.start_conversation(
+        user_id=user_id,
+        preset_id=preset_id,
+        topic=topic,
+        max_rounds=10
+    )
+    
+    # Start conversation streaming task
+    asyncio.create_task(stream_conversation_events(update, context, conversation_id))
+    
+    return conversation_id
 
 
 async def stream_conversation_events(update: Update, context: ContextTypes.DEFAULT_TYPE, 
@@ -260,72 +227,34 @@ async def stream_conversation_events(update: Update, context: ContextTypes.DEFAU
         context: Bot context
         conversation_id: The conversation ID
     """
-    user_id = str(update.effective_user.id)
+    user_id = get_user_id(update)
     
     try:
-        # Get adapter from context
-        adapter = context.bot_data.get('adapter')
-        if not adapter:
-            return
+        # Get adapter and create conversation service
+        from ..utils.context_helpers import require_adapter
+        adapter = await require_adapter(update, context)
+        conversation_service = ConversationService(adapter, state_manager)
         
-        # Get conversation state
-        user_state = state_manager.get_user_state(user_id)
-        
-        # Stream events
-        async for event in adapter.stream_events(conversation_id):
-            # Check if conversation is still active
-            if not state_manager.is_user_in_conversation(user_id):
-                break
-            
-            # Handle different event types
-            event_type = event.event_type
-            content = event.content
-            agent_id = event.agent_id
-            role = event.role
-            
-            # Format message based on event type
+        # Define event handler
+        async def handle_event(event_type: str, content: str, agent_id: str = None, role: str = None):
+            # Format message based on event type using templates
             if event_type == "conversation_started":
-                message = "🚀 **Conversation Started!**\n\n"
-                message += "The AI agents are now discussing your topic. "
-                message += "You'll see their messages in real-time below.\n\n"
-                message += "---"
-                
+                message = MessageTemplates.conversation_started_message()
             elif event_type == "agent_message":
-                # Format agent message
-                if role == "user":
-                    # This is actually a user message
-                    message = f"👤 **You:** {content}"
-                elif role == "moderator":
-                    message = f"👨‍⚖️ **Moderator:** {content}"
-                elif role == "summarizer":
-                    message = f"📝 **Summarizer:** {content}"
-                else:
-                    # Regular agent message
-                    agent_name = agent_id or "Agent"
-                    message = f"🤖 **{agent_name}:** {content}"
-                
+                message = MessageTemplates.agent_message(role, content, agent_id)
             elif event_type == "user_message":
-                message = f"👤 **You:** {content}"
-                
+                message = MessageTemplates.agent_message("user", content, agent_id)
             elif event_type == "user_turn":
-                message = "👤 **It's your turn!** What would you like to say?\n\n"
-                message += "Type your message below:"
-                
+                message = MessageTemplates.user_turn_message()
                 # Update user state to waiting for input
                 state_manager.set_user_state(user_id, ConversationState.WAITING_FOR_USER_INPUT)
-                
             elif event_type == "conversation_completed":
-                message = "✅ **Conversation Completed!**\n\n"
-                message += "The discussion has ended. Thank you for participating!\n\n"
-                message += "Use /start to begin a new conversation."
-                
+                message = MessageTemplates.conversation_completed_message()
                 # Update user state
                 state_manager.set_user_state(user_id, ConversationState.CONVERSATION_ENDED)
-                
             elif event_type == "error":
                 message = f"❌ **Error:** {content}"
                 state_manager.set_user_state(user_id, ConversationState.ERROR)
-                
             else:
                 # Unknown event type, just show content
                 message = f"📢 {content}"
@@ -341,20 +270,23 @@ async def stream_conversation_events(update: Update, context: ContextTypes.DEFAU
                 except Exception as e2:
                     logger.error(f"Error sending plain text message: {e2}")
         
+        # Start conversation streaming using service
+        await conversation_service.start_conversation_streaming(user_id, handle_event)
+        
     except Exception as e:
         logger.error(f"Error streaming conversation events: {e}")
         state_manager.set_user_state(user_id, ConversationState.ERROR)
         
         try:
             await update.message.reply_text(
-                "❌ **Connection Error**\n\n"
-                "The conversation connection was lost. "
-                "Please start a new conversation with /start."
+                MessageTemplates.connection_error_message(),
+                parse_mode='Markdown'
             )
         except Exception as e2:
             logger.error(f"Error sending error message: {e2}")
 
 
+@handle_errors("Error pausing conversation. Please try again.")
 async def pause_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Pause an active conversation.
@@ -363,52 +295,29 @@ async def pause_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE)
         update: Telegram update object
         context: Bot context
     """
-    user_id = str(update.effective_user.id)
+    user_id = get_user_id(update)
     
-    try:
-        # Check if user is in conversation
-        if not state_manager.is_user_in_conversation(user_id):
-            await update.message.reply_text(
-                "❌ You don't have an active conversation to pause."
-            )
-            return
-        
-        # Get conversation ID
-        user_state = state_manager.get_user_state(user_id)
-        conversation_id = user_state.conversation_id
-        
-        if not conversation_id:
-            await update.message.reply_text(
-                "❌ No active conversation found."
-            )
-            return
-        
-        # Get adapter from context
-        adapter = context.bot_data.get('adapter')
-        if not adapter:
-            await update.message.reply_text(
-                "❌ Bot not properly initialized. Please try again later."
-            )
-            return
-        
-        # Pause conversation
-        adapter.pause_conversation(conversation_id)
-        
-        # Update user state
-        state_manager.set_user_state(user_id, ConversationState.CONVERSATION_PAUSED)
-        
-        await update.message.reply_text(
-            "⏸️ **Conversation Paused**\n\n"
-            "The conversation has been paused. Use /resume to continue."
-        )
-        
-    except Exception as e:
-        logger.error(f"Error pausing conversation: {e}")
-        await update.message.reply_text(
-            "❌ Error pausing conversation. Please try again."
-        )
+    # Check if user is in conversation
+    if not state_manager.is_user_in_conversation(user_id):
+        await update.message.reply_text(Messages.NO_CONVERSATION_TO_PAUSE)
+        return
+    
+    # Get adapter and create conversation service
+    from ..utils.context_helpers import require_adapter
+    adapter = await require_adapter(update, context)
+    conversation_service = ConversationService(adapter, state_manager)
+    
+    # Pause conversation using service
+    await conversation_service.pause_conversation(user_id)
+    
+    # Show confirmation using template
+    await update.message.reply_text(
+        MessageTemplates.conversation_paused_message(),
+        parse_mode='Markdown'
+    )
 
 
+@handle_errors("Error resuming conversation. Please try again.")
 async def resume_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Resume a paused conversation.
@@ -417,52 +326,30 @@ async def resume_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE
         update: Telegram update object
         context: Bot context
     """
-    user_id = str(update.effective_user.id)
+    user_id = get_user_id(update)
     
-    try:
-        # Check if user has a paused conversation
-        user_state = state_manager.get_user_state(user_id)
-        if user_state.state != ConversationState.CONVERSATION_PAUSED:
-            await update.message.reply_text(
-                "❌ You don't have a paused conversation to resume."
-            )
-            return
-        
-        # Get conversation ID
-        conversation_id = user_state.conversation_id
-        
-        if not conversation_id:
-            await update.message.reply_text(
-                "❌ No paused conversation found."
-            )
-            return
-        
-        # Get adapter from context
-        adapter = context.bot_data.get('adapter')
-        if not adapter:
-            await update.message.reply_text(
-                "❌ Bot not properly initialized. Please try again later."
-            )
-            return
-        
-        # Resume conversation
-        adapter.resume_conversation(conversation_id)
-        
-        # Update user state
-        state_manager.set_user_state(user_id, ConversationState.IN_CONVERSATION)
-        
-        await update.message.reply_text(
-            "▶️ **Conversation Resumed**\n\n"
-            "The conversation has been resumed. The AI agents will continue."
-        )
-        
-    except Exception as e:
-        logger.error(f"Error resuming conversation: {e}")
-        await update.message.reply_text(
-            "❌ Error resuming conversation. Please try again."
-        )
+    # Check if user has a paused conversation
+    user_state = state_manager.get_user_state(user_id)
+    if user_state.state != ConversationState.CONVERSATION_PAUSED:
+        await update.message.reply_text(Messages.NO_PAUSED_CONVERSATION)
+        return
+    
+    # Get adapter and create conversation service
+    from ..utils.context_helpers import require_adapter
+    adapter = await require_adapter(update, context)
+    conversation_service = ConversationService(adapter, state_manager)
+    
+    # Resume conversation using service
+    await conversation_service.resume_conversation(user_id)
+    
+    # Show confirmation using template
+    await update.message.reply_text(
+        MessageTemplates.conversation_resumed_message(),
+        parse_mode='Markdown'
+    )
 
 
+@handle_errors("Error stopping conversation. Please try again.")
 async def stop_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Stop an active conversation.
@@ -471,47 +358,23 @@ async def stop_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         update: Telegram update object
         context: Bot context
     """
-    user_id = str(update.effective_user.id)
+    user_id = get_user_id(update)
     
-    try:
-        # Check if user is in conversation
-        if not state_manager.is_user_in_conversation(user_id):
-            await update.message.reply_text(
-                "❌ You don't have an active conversation to stop."
-            )
-            return
-        
-        # Get conversation ID
-        user_state = state_manager.get_user_state(user_id)
-        conversation_id = user_state.conversation_id
-        
-        if not conversation_id:
-            await update.message.reply_text(
-                "❌ No active conversation found."
-            )
-            return
-        
-        # Get adapter from context
-        adapter = context.bot_data.get('adapter')
-        if not adapter:
-            await update.message.reply_text(
-                "❌ Bot not properly initialized. Please try again later."
-            )
-            return
-        
-        # Stop conversation
-        adapter.stop_conversation(conversation_id)
-        
-        # Update user state
-        state_manager.set_user_state(user_id, ConversationState.CONVERSATION_ENDED)
-        
-        await update.message.reply_text(
-            "⏹️ **Conversation Stopped**\n\n"
-            "The conversation has been ended. Use /start to begin a new one."
-        )
-        
-    except Exception as e:
-        logger.error(f"Error stopping conversation: {e}")
-        await update.message.reply_text(
-            "❌ Error stopping conversation. Please try again."
-        )
+    # Check if user is in conversation
+    if not state_manager.is_user_in_conversation(user_id):
+        await update.message.reply_text(Messages.NO_CONVERSATION_TO_STOP)
+        return
+    
+    # Get adapter and create conversation service
+    from ..utils.context_helpers import require_adapter
+    adapter = await require_adapter(update, context)
+    conversation_service = ConversationService(adapter, state_manager)
+    
+    # Stop conversation using service
+    await conversation_service.stop_conversation(user_id)
+    
+    # Show confirmation using template
+    await update.message.reply_text(
+        MessageTemplates.conversation_stopped_message(),
+        parse_mode='Markdown'
+    )

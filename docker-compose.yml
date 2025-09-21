@@ -1,0 +1,79 @@
+# 🐳 AgentryLab Telegram Bot - Docker Compose
+version: '3.8'
+
+services:
+  agentrybot:
+    build: .
+    container_name: agentrybot
+    restart: unless-stopped
+    environment:
+      # Bot Configuration
+      - BOT_TOKEN=${BOT_TOKEN}
+      - BOT_USERNAME=${BOT_USERNAME}
+      - AGENTRYLAB_PATH=${AGENTRYLAB_PATH:-/app/agentrylab}
+      
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FILE=${LOG_FILE:-/app/logs/bot.log}
+      
+      # Deployment Mode
+      - POLLING=${POLLING:-true}
+      - WEBHOOK_URL=${WEBHOOK_URL:-}
+      - WEBHOOK_PORT=${WEBHOOK_PORT:-8443}
+      
+      # Security
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Persist logs
+      - ./logs:/app/logs
+      # Persist conversation data
+      - ./data:/app/data
+      # Mount AgentryLab (if external)
+      - ${AGENTRYLAB_PATH}:/app/agentrylab:ro
+    ports:
+      # Webhook port (only if using webhook mode)
+      - "${WEBHOOK_PORT:-8443}:8443"
+    networks:
+      - agentrybot-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Redis for session storage (if needed)
+  redis:
+    image: redis:7-alpine
+    container_name: agentrybot-redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    networks:
+      - agentrybot-network
+    command: redis-server --appendonly yes
+
+  # Optional: Nginx for webhook (if using webhook mode)
+  nginx:
+    image: nginx:alpine
+    container_name: agentrybot-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - agentrybot
+    networks:
+      - agentrybot-network
+    profiles:
+      - webhook
+
+volumes:
+  redis-data:
+
+networks:
+  agentrybot-network:
+    driver: bridge

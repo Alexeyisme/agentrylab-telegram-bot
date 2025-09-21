@@ -7,20 +7,10 @@ import asyncio
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from telegram import Update, User, Message, Chat, CallbackQuery
 
-from bot.main import (
-    start_command,
-    help_command,
-    presets_command,
-    status_command,
-    pause_command,
-    resume_command,
-    stop_command,
-    handle_message,
-    handle_callback_query,
-    setup_handlers
-)
-from bot.handlers import presets, conversation
-from bot.states.conversation import ConversationStateManager, ConversationState
+from bot.handlers import commands, callbacks, messages
+from bot.state import state
+from bot.registry import services
+from tests.factories.test_data import TestDataFactory
 
 
 class TestBotIntegration:
@@ -28,26 +18,18 @@ class TestBotIntegration:
     
     @pytest.fixture
     def mock_update(self):
-        """Create a mock update object."""
-        update = Mock(spec=Update)
-        update.effective_user = Mock(spec=User)
-        update.effective_user.id = 123456789
-        update.effective_user.username = "testuser"
-        update.effective_user.first_name = "Test"
-        update.message = Mock(spec=Message)
-        update.message.reply_text = AsyncMock()
-        return update
+        """Create a mock update object using test factory."""
+        return TestDataFactory.create_mock_update()
     
     @pytest.fixture
     def mock_context(self):
-        """Create a mock context object."""
-        context = Mock()
-        context.bot_data = {
-            'adapter': Mock(),
-            'state_manager': ConversationStateManager()
-        }
-        context.user_data = {}
-        return context
+        """Create a mock context object using test factory."""
+        return TestDataFactory.create_mock_context(
+            bot_data={
+                'adapter': TestDataFactory.create_mock_adapter(),
+                'state_manager': ConversationStateManager()
+            }
+        )
     
     @pytest.fixture
     def mock_callback_query(self):
@@ -433,6 +415,130 @@ class TestErrorHandlingIntegration(TestBotIntegration):
         
         call_args = mock_update.message.reply_text.call_args[0][0]
         assert "empty" in call_args.lower()
+
+
+class TestIntegrationWithFactories:
+    """Test bot integration using test factories."""
+    
+    @pytest.fixture
+    def factory_update(self):
+        """Create an update object using test factory."""
+        return TestDataFactory.create_mock_update(
+            message_text="Test message",
+            user_id=TestDataFactory.create_user_id(),
+            username="factory_user"
+        )
+    
+    @pytest.fixture
+    def factory_context(self):
+        """Create a context object using test factory."""
+        return TestDataFactory.create_mock_context(
+            bot_data={
+                'adapter': TestDataFactory.create_mock_adapter(),
+                'state_manager': ConversationStateManager()
+            }
+        )
+    
+    @pytest.mark.asyncio
+    async def test_start_command_with_factory(self, factory_update, factory_context):
+        """Test start command using factory data."""
+        await start_command(factory_update, factory_context)
+        
+        # Verify message was sent
+        factory_update.message.reply_text.assert_called_once()
+        
+        call_args = factory_update.message.reply_text.call_args[0][0]
+        assert "Welcome to AgentryLab" in call_args
+    
+    @pytest.mark.asyncio
+    async def test_help_command_with_factory(self, factory_update, factory_context):
+        """Test help command using factory data."""
+        await help_command(factory_update, factory_context)
+        
+        # Verify message was sent
+        factory_update.message.reply_text.assert_called_once()
+        
+        call_args = factory_update.message.reply_text.call_args[0][0]
+        assert "Available Commands" in call_args
+    
+    @pytest.mark.asyncio
+    async def test_presets_command_with_factory(self, factory_update, factory_context):
+        """Test presets command using factory data."""
+        await presets_command(factory_update, factory_context)
+        
+        # Verify message was sent
+        factory_update.message.reply_text.assert_called_once()
+        
+        call_args = factory_update.message.reply_text.call_args[0][0]
+        assert "Choose a Conversation Type" in call_args
+    
+    @pytest.mark.asyncio
+    async def test_status_command_with_factory(self, factory_update, factory_context):
+        """Test status command using factory data."""
+        await status_command(factory_update, factory_context)
+        
+        # Verify message was sent
+        factory_update.message.reply_text.assert_called_once()
+        
+        call_args = factory_update.message.reply_text.call_args[0][0]
+        assert "no active conversations" in call_args.lower()
+    
+    @pytest.mark.asyncio
+    async def test_handle_message_with_factory(self, factory_update, factory_context):
+        """Test message handling using factory data."""
+        await handle_message(factory_update, factory_context)
+        
+        # Verify message was sent
+        factory_update.message.reply_text.assert_called_once()
+        
+        call_args = factory_update.message.reply_text.call_args[0][0]
+        assert "Hello" in call_args or "start" in call_args.lower()
+    
+    @pytest.mark.asyncio
+    async def test_conversation_flow_with_factory(self, factory_update, factory_context):
+        """Test complete conversation flow using factory data."""
+        # Set up conversation state
+        user_id = TestDataFactory.create_user_id()
+        state_manager = factory_context.bot_data['state_manager']
+        state_manager.set_user_state(user_id, ConversationState.IN_CONVERSATION)
+        
+        # Test pause command
+        await pause_command(factory_update, factory_context)
+        
+        # Verify message was sent
+        factory_update.message.reply_text.assert_called_once()
+        
+        call_args = factory_update.message.reply_text.call_args[0][0]
+        assert "no active conversation" in call_args.lower() or "paused" in call_args.lower()
+    
+    @pytest.mark.asyncio
+    async def test_error_handling_with_factory(self, factory_update, factory_context):
+        """Test error handling using factory data."""
+        # Mock adapter to raise exception
+        mock_adapter = factory_context.bot_data['adapter']
+        mock_adapter.get_available_presets.side_effect = Exception("Test error")
+        
+        await presets_command(factory_update, factory_context)
+        
+        # Verify error message was sent
+        factory_update.message.reply_text.assert_called_once()
+        
+        call_args = factory_update.message.reply_text.call_args[0][0]
+        assert "error" in call_args.lower() or "try again" in call_args.lower()
+    
+    @pytest.mark.asyncio
+    async def test_callback_query_with_factory(self, factory_update, factory_context):
+        """Test callback query handling using factory data."""
+        # Create callback query update
+        callback_update = TestDataFactory.create_mock_update(
+            callback_data="preset_debates",
+            user_id=TestDataFactory.create_user_id()
+        )
+        
+        await handle_callback_query(callback_update, factory_context)
+        
+        # Verify callback was handled (no exception raised)
+        assert True  # If we get here, the callback was handled successfully
 
 
 if __name__ == "__main__":

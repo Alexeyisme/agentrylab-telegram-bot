@@ -11,6 +11,7 @@ from bot.utils.validation import (
     validate_conversation_id,
     sanitize_text
 )
+from tests.factories.test_data import TestDataFactory
 
 
 class TestValidateTopicInput:
@@ -18,10 +19,11 @@ class TestValidateTopicInput:
     
     def test_valid_topic(self):
         """Test valid topic input."""
-        result = validate_topic_input("Should remote work become the standard?")
+        topic = TestDataFactory.create_topic()
+        result = validate_topic_input(topic)
         assert result['valid'] is True
         assert result['error'] is None
-        assert result['cleaned_topic'] == "Should remote work become the standard?"
+        assert result['cleaned_topic'] == topic
     
     def test_empty_topic(self):
         """Test empty topic input."""
@@ -53,6 +55,24 @@ class TestValidateTopicInput:
         result = validate_topic_input("How to hack into systems")
         assert result['valid'] is False
         assert "inappropriate" in result['error'].lower()
+    
+    def test_validation_with_factory_data(self):
+        """Test validation using test factory data."""
+        # Test with factory-generated topic
+        topic = TestDataFactory.create_topic("Custom test topic")
+        result = validate_topic_input(topic)
+        assert result['valid'] is True
+        assert result['cleaned_topic'] == topic
+    
+    def test_validation_error_with_factory(self):
+        """Test validation error using test factory."""
+        # Test with factory-generated validation result
+        validation_result = TestDataFactory.create_validation_result(
+            valid=False,
+            error="Test error message"
+        )
+        assert validation_result['valid'] is False
+        assert validation_result['error'] == "Test error message"
     
     def test_excessive_repetition(self):
         """Test topic with excessive repetition."""
@@ -238,6 +258,48 @@ class TestSanitizeText:
         """Test sanitizing None."""
         result = sanitize_text(None)
         assert result == ""
+    
+    def test_sanitize_with_factory_data(self):
+        """Test sanitization using test factory data."""
+        # Test with factory-generated text
+        text = TestDataFactory.create_topic("Test <script>alert('xss')</script> topic")
+        result = sanitize_text(text)
+        assert "<script>" not in result
+        assert "alert" not in result
+        assert "Test" in result
+        assert "topic" in result
+
+
+class TestValidationWithFactories:
+    """Test validation functions using test factories."""
+    
+    def test_validate_user_id_with_factory(self):
+        """Test user ID validation using factory data."""
+        user_id = TestDataFactory.create_user_id()
+        result = validate_user_id(user_id)
+        assert result['valid'] is True
+        assert result['cleaned_user_id'] == user_id
+    
+    def test_validate_preset_id_with_factory(self):
+        """Test preset ID validation using factory data."""
+        preset_id = TestDataFactory.create_preset_id()
+        result = validate_preset_id(preset_id)
+        assert result['valid'] is True
+        assert result['cleaned_preset_id'] == preset_id
+    
+    def test_validate_conversation_id_with_factory(self):
+        """Test conversation ID validation using factory data."""
+        conversation_id = TestDataFactory.create_conversation_id()
+        result = validate_conversation_id(conversation_id)
+        assert result['valid'] is True
+        assert result['cleaned_conversation_id'] == conversation_id
+    
+    def test_validate_user_message_with_factory(self):
+        """Test user message validation using factory data."""
+        message = TestDataFactory.create_topic("Test user message")
+        result = validate_user_message(message)
+        assert result['valid'] is True
+        assert result['cleaned_message'] == message
 
 
 if __name__ == "__main__":

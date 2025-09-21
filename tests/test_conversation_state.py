@@ -10,6 +10,7 @@ from bot.states.conversation import (
     UserConversationState,
     ConversationStateManager
 )
+from tests.factories.test_data import TestDataFactory
 
 
 class TestConversationState:
@@ -34,7 +35,7 @@ class TestUserConversationState:
     
     def test_user_conversation_state_creation(self):
         """Test creating a user conversation state."""
-        user_id = "123456789"
+        user_id = TestDataFactory.create_user_id()
         state = UserConversationState(user_id=user_id)
         
         assert state.user_id == user_id
@@ -473,6 +474,95 @@ class TestConversationStateManager:
         assert cleaned_count == 1
         assert "user1" not in manager._user_states
         assert "user2" in manager._user_states
+
+
+class TestStateManagementWithFactories:
+    """Test state management using test factories."""
+    
+    def test_user_conversation_state_with_factory(self):
+        """Test user conversation state using factory data."""
+        # Create state using factory
+        user_state = TestDataFactory.create_user_conversation_state()
+        
+        assert isinstance(user_state, UserConversationState)
+        assert user_state.user_id is not None
+        assert user_state.state is not None
+        assert isinstance(user_state.last_activity, datetime)
+        assert isinstance(user_state.metadata, dict)
+    
+    def test_conversation_state_manager_with_factory(self):
+        """Test conversation state manager using factory data."""
+        manager = ConversationStateManager()
+        
+        # Create multiple users using factory
+        user_ids = [TestDataFactory.create_user_id() for _ in range(3)]
+        
+        for user_id in user_ids:
+            manager.set_user_state(user_id, ConversationState.IDLE)
+        
+        # Test that all users are tracked
+        for user_id in user_ids:
+            assert manager.has_user(user_id)
+            assert manager.get_user_state(user_id).user_id == user_id
+    
+    def test_conversation_events_with_factory(self):
+        """Test conversation events using factory data."""
+        # Create conversation event using factory
+        event = TestDataFactory.create_mock_conversation_event()
+        
+        assert event.conversation_id is not None
+        assert event.event_type is not None
+        assert event.content is not None
+        assert isinstance(event.metadata, dict)
+    
+    def test_conversation_state_with_factory(self):
+        """Test conversation state using factory data."""
+        # Create conversation state using factory
+        conversation_state = TestDataFactory.create_mock_conversation_state()
+        
+        assert conversation_state.conversation_id is not None
+        assert conversation_state.preset_id is not None
+        assert conversation_state.topic is not None
+        assert conversation_state.user_id is not None
+        assert conversation_state.status is not None
+        assert isinstance(conversation_state.metadata, dict)
+    
+    def test_state_transitions_with_factory(self):
+        """Test state transitions using factory data."""
+        manager = ConversationStateManager()
+        user_id = TestDataFactory.create_user_id()
+        
+        # Test state transitions
+        states = [
+            ConversationState.IDLE,
+            ConversationState.SELECTING_PRESET,
+            ConversationState.ENTERING_TOPIC,
+            ConversationState.CONFIRMING_TOPIC,
+            ConversationState.STARTING_CONVERSATION,
+            ConversationState.IN_CONVERSATION
+        ]
+        
+        for state in states:
+            manager.set_user_state(user_id, state)
+            assert manager.get_user_state(user_id).state == state
+    
+    def test_conversation_analytics_with_factory(self):
+        """Test conversation analytics using factory data."""
+        # Create analytics data using factory
+        analytics = TestDataFactory.create_mock_conversation_analytics()
+        
+        assert analytics['conversation_id'] is not None
+        assert analytics['preset_id'] is not None
+        assert analytics['topic'] is not None
+        assert analytics['user_id'] is not None
+        assert analytics['start_time'] is not None
+        assert analytics['end_time'] is not None
+        assert analytics['total_messages'] > 0
+        assert analytics['user_messages'] >= 0
+        assert analytics['agent_messages'] >= 0
+        assert analytics['status'] is not None
+        assert analytics['duration_seconds'] > 0
+        assert analytics['duration_minutes'] > 0
 
 
 if __name__ == "__main__":

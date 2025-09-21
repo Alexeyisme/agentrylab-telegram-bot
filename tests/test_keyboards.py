@@ -15,6 +15,7 @@ from bot.keyboards.presets import (
     get_preset_description,
     get_preset_examples
 )
+from tests.factories.test_data import TestDataFactory
 
 
 class TestPresetSelectionKeyboard:
@@ -22,27 +23,9 @@ class TestPresetSelectionKeyboard:
     
     def test_create_preset_selection_keyboard(self):
         """Test creating preset selection keyboard."""
-        presets = ["debates", "therapy", "brainstorm"]
-        preset_info = {
-            "debates": {
-                "display_name": "Debates",
-                "description": "Structured debates",
-                "emoji": "⚖️",
-                "category": "Discussion"
-            },
-            "therapy": {
-                "display_name": "Therapy",
-                "description": "Therapeutic conversations",
-                "emoji": "🛋️",
-                "category": "Support"
-            },
-            "brainstorm": {
-                "display_name": "Brainstorming",
-                "description": "Creative brainstorming",
-                "emoji": "💡",
-                "category": "Creative"
-            }
-        }
+        # Use test factory to generate preset data
+        preset_info = TestDataFactory.create_preset_info_batch(["debates", "therapy", "brainstorm"])
+        presets = list(preset_info.keys())
         
         keyboard = create_preset_selection_keyboard(presets, preset_info)
         
@@ -266,6 +249,107 @@ class TestKeyboardIntegration:
         
         assert start_button is not None
         assert start_button.callback_data == "start_debates"
+
+
+class TestKeyboardsWithFactories:
+    """Test keyboard generation using test factories."""
+    
+    def test_preset_selection_keyboard_with_factory(self):
+        """Test preset selection keyboard using factory data."""
+        # Generate preset data using factory
+        preset_info = TestDataFactory.create_preset_info_batch()
+        presets = list(preset_info.keys())
+        
+        keyboard = create_preset_selection_keyboard(presets, preset_info)
+        
+        assert isinstance(keyboard, InlineKeyboardMarkup)
+        assert len(keyboard.inline_keyboard) > 0
+        
+        # Check that all presets have corresponding buttons
+        all_buttons = []
+        for row in keyboard.inline_keyboard:
+            for button in row:
+                all_buttons.append(button.callback_data)
+        
+        for preset_id in presets:
+            assert f"preset_{preset_id}" in all_buttons
+    
+    def test_preset_info_keyboard_with_factory(self):
+        """Test preset info keyboard using factory data."""
+        preset_id = TestDataFactory.create_preset_id()
+        
+        keyboard = create_preset_info_keyboard(preset_id)
+        
+        assert isinstance(keyboard, InlineKeyboardMarkup)
+        assert len(keyboard.inline_keyboard) > 0
+        
+        # Check for expected buttons
+        all_buttons = []
+        for row in keyboard.inline_keyboard:
+            for button in row:
+                all_buttons.append(button.callback_data)
+        
+        assert f"select_{preset_id}" in all_buttons
+        assert f"examples_{preset_id}" in all_buttons
+        assert "back_to_presets" in all_buttons
+        assert "cancel" in all_buttons
+    
+    def test_preset_examples_keyboard_with_factory(self):
+        """Test preset examples keyboard using factory data."""
+        preset_id = TestDataFactory.create_preset_id()
+        
+        keyboard = create_preset_examples_keyboard(preset_id)
+        
+        assert isinstance(keyboard, InlineKeyboardMarkup)
+        assert len(keyboard.inline_keyboard) > 0
+        
+        # Check for expected buttons
+        all_buttons = []
+        for row in keyboard.inline_keyboard:
+            for button in row:
+                all_buttons.append(button.callback_data)
+        
+        assert f"example_{preset_id}" in all_buttons
+        assert f"custom_{preset_id}" in all_buttons
+        assert f"info_{preset_id}" in all_buttons
+        assert "cancel" in all_buttons
+    
+    def test_topic_confirmation_keyboard_with_factory(self):
+        """Test topic confirmation keyboard using factory data."""
+        preset_id = TestDataFactory.create_preset_id()
+        topic = TestDataFactory.create_topic()
+        
+        keyboard = create_topic_confirmation_keyboard(preset_id, topic)
+        
+        assert isinstance(keyboard, InlineKeyboardMarkup)
+        assert len(keyboard.inline_keyboard) > 0
+        
+        # Check for expected buttons
+        all_buttons = []
+        for row in keyboard.inline_keyboard:
+            for button in row:
+                all_buttons.append(button.callback_data)
+        
+        assert f"start_{preset_id}" in all_buttons
+        assert f"edit_{preset_id}" in all_buttons
+        assert "back_to_presets" in all_buttons
+        assert "cancel" in all_buttons
+    
+    def test_keyboard_markup_with_factory(self):
+        """Test keyboard markup generation using factory data."""
+        # Test with factory-generated keyboard markup
+        keyboard_markup = TestDataFactory.create_keyboard_markup()
+        
+        assert isinstance(keyboard_markup, InlineKeyboardMarkup)
+        assert len(keyboard_markup.inline_keyboard) > 0
+        
+        # Check that all buttons are properly formatted
+        for row in keyboard_markup.inline_keyboard:
+            assert isinstance(row, list)
+            for button in row:
+                assert isinstance(button, InlineKeyboardButton)
+                assert button.text is not None
+                assert button.callback_data is not None
 
 
 if __name__ == "__main__":
