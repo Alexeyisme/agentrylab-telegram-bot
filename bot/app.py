@@ -28,8 +28,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def main() -> None:
-    """Main application entry point."""
+def main() -> None:
+    """Main application entry point (synchronous)."""
     logger.info("Starting AgentryLab Telegram Bot...")
     
     # Initialize AgentryLab adapter
@@ -52,10 +52,10 @@ async def main() -> None:
     # Start the bot
     if POLLING:
         logger.info("Starting bot in polling mode...")
-        await application.run_polling()
+        application.run_polling()
     else:
         logger.info(f"Starting bot in webhook mode on {WEBHOOK_URL}")
-        await application.run_webhook(
+        application.run_webhook(
             listen="0.0.0.0",
             port=WEBHOOK_PORT,
             webhook_url=WEBHOOK_URL
@@ -88,7 +88,7 @@ async def error_handler(update, context) -> None:
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        main()
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")
     except Exception as e:
