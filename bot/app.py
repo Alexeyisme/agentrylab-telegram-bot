@@ -14,16 +14,7 @@ from agentrylab.telegram import TelegramAdapter
 current_dir = os.path.dirname(__file__)
 sys.path.append(current_dir)
 sys.path.append(os.path.abspath(os.path.join(current_dir, os.pardir)))
-try:
-    from config import BOT_TOKEN, LOG_LEVEL, LOG_FILE, POLLING, WEBHOOK_URL, WEBHOOK_PORT
-except Exception:
-    # Fallback to environment variables if config.py is not found in the image
-    BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-    LOG_FILE = os.getenv("LOG_FILE", "/app/logs/bot.log")
-    POLLING = os.getenv("POLLING", "true").lower() == "true"
-    WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
-    WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "8443"))
+from config import BOT_TOKEN, LOG_LEVEL, LOG_FILE, POLLING, WEBHOOK_URL, WEBHOOK_PORT
 from registry import services
 from state import state
 from handlers import commands, callbacks, messages

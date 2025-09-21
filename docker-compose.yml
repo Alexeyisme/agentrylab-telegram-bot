@@ -10,6 +10,7 @@ services:
       - BOT_TOKEN=${BOT_TOKEN}
       - BOT_USERNAME=${BOT_USERNAME}
       - AGENTRYLAB_PATH=${AGENTRYLAB_PATH:-/app/agentrylab}
+      - PYTHONPATH=/app
       
       # Logging
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
