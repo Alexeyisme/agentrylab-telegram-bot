@@ -4,13 +4,14 @@ Simplified main application entry point.
 
 import asyncio
 import logging
+import sys
 
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from agentrylab.telegram import TelegramAdapter
-from .config import BOT_TOKEN, LOG_LEVEL, LOG_FILE, POLLING, WEBHOOK_URL, WEBHOOK_PORT
-from .registry import services
-from .state import state
-from .handlers import commands, callbacks, messages
+from config import BOT_TOKEN, LOG_LEVEL, LOG_FILE, POLLING, WEBHOOK_URL, WEBHOOK_PORT
+from registry import services
+from state import state
+from handlers import commands, callbacks, messages
 
 # Configure logging
 logging.basicConfig(
