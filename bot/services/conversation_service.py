@@ -62,6 +62,7 @@ class ConversationService:
         try:
             # Validate user can start conversation
             user_state = self.state_manager.get_user_state(user_id)
+            logger.info(f"User {user_id} state: {user_state.state.value}, can_start: {user_state.can_start_new_conversation()}")
             if not user_state.can_start_new_conversation():
                 raise UserNotActiveError("User already has an active conversation")
             
