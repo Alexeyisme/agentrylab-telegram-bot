@@ -17,7 +17,7 @@ from ..utils.error_handling import BotNotInitializedError, UserNotActiveError, C
 state_manager = ConversationStateManager()
 
 
-def get_adapter(context: ContextTypes.DEFAULT_TYPE) -> Any:
+def get_adapter(context: Optional[ContextTypes.DEFAULT_TYPE]) -> Any:
     """
     Get adapter from context with validation.
     
@@ -30,13 +30,16 @@ def get_adapter(context: ContextTypes.DEFAULT_TYPE) -> Any:
     Raises:
         BotNotInitializedError: If adapter is not available
     """
+    if not context or not hasattr(context, 'bot_data') or context.bot_data is None:
+        raise BotNotInitializedError("Bot not properly initialized")
+
     adapter = context.bot_data.get('adapter')
     if not adapter:
         raise BotNotInitializedError("Bot not properly initialized")
     return adapter
 
 
-async def require_adapter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+async def require_adapter(update: Optional[Update], context: Optional[ContextTypes.DEFAULT_TYPE]) -> Any:
     """
     Get adapter from context or send error message if not available.
     
@@ -53,11 +56,12 @@ async def require_adapter(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     try:
         return get_adapter(context)
     except BotNotInitializedError:
-        await update.message.reply_text(Messages.BOT_NOT_INITIALIZED)
+        if update and getattr(update, 'message', None):
+            await update.message.reply_text(Messages.BOT_NOT_INITIALIZED)
         raise
 
 
-def get_state_manager(context: ContextTypes.DEFAULT_TYPE) -> ConversationStateManager:
+def get_state_manager(context: Optional[ContextTypes.DEFAULT_TYPE]) -> ConversationStateManager:
     """
     Get state manager from context with validation.
     
@@ -70,14 +74,24 @@ def get_state_manager(context: ContextTypes.DEFAULT_TYPE) -> ConversationStateMa
     Raises:
         BotNotInitializedError: If state manager is not available
     """
-    state_mgr = context.bot_data.get('state_manager')
-    if not state_mgr:
-        # Fallback to global instance
-        return state_manager
-    return state_mgr
+    if context and hasattr(context, 'bot_data') and context.bot_data is not None:
+        state_mgr = context.bot_data.get('state_manager')
+        if state_mgr:
+            return state_mgr
+
+    # Fallback to registry state manager if available
+    try:
+        from ..services import services  # Local import to avoid circular dependency
+
+        if services.state_manager:
+            return services.state_manager
+    except Exception:  # pragma: no cover - defensive
+        pass
+
+    return state_manager
 
 
-def get_user_id(update: Update) -> str:
+def get_user_id(update: Optional[Update]) -> Optional[str]:
     """
     Extract user ID from update.
     
@@ -87,15 +101,20 @@ def get_user_id(update: Update) -> str:
     Returns:
         User ID as string
     """
-    if update.effective_user:
+    if not update:
+        return None
+
+    if getattr(update, 'effective_user', None) and update.effective_user.id is not None:
         return str(update.effective_user.id)
-    elif update.callback_query and update.callback_query.from_user:
-        return str(update.callback_query.from_user.id)
-    else:
-        raise ValueError("Could not extract user ID from update")
+    callback_query = update.__dict__.get('callback_query') if hasattr(update, '__dict__') else None
+    if callback_query and getattr(callback_query, 'from_user', None):
+        user_id = callback_query.from_user.id
+        if user_id is not None:
+            return str(user_id)
+    return None
 
 
-def get_user_state(update: Update, context: ContextTypes.DEFAULT_TYPE) -> UserConversationState:
+def get_user_state(update: Optional[Update], context: Optional[ContextTypes.DEFAULT_TYPE]) -> UserConversationState:
     """
     Get user conversation state.
     
@@ -107,11 +126,14 @@ def get_user_state(update: Update, context: ContextTypes.DEFAULT_TYPE) -> UserCo
         UserConversationState instance
     """
     user_id = get_user_id(update)
+    if user_id is None:
+        raise UserNotActiveError("User information not available")
+
     state_mgr = get_state_manager(context)
     return state_mgr.get_user_state(user_id)
 
 
-async def require_active_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> UserConversationState:
+async def require_active_user(update: Optional[Update], context: Optional[ContextTypes.DEFAULT_TYPE]) -> UserConversationState:
     """
     Get user state or send error message if not active.
     
@@ -134,7 +156,7 @@ async def require_active_user(update: Update, context: ContextTypes.DEFAULT_TYPE
     return user_state
 
 
-async def require_user_in_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> UserConversationState:
+async def require_user_in_conversation(update: Optional[Update], context: Optional[ContextTypes.DEFAULT_TYPE]) -> UserConversationState:
     """
     Get user state or send error message if not in conversation.
     
@@ -157,7 +179,7 @@ async def require_user_in_conversation(update: Update, context: ContextTypes.DEF
     return user_state
 
 
-async def require_paused_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> UserConversationState:
+async def require_paused_conversation(update: Optional[Update], context: Optional[ContextTypes.DEFAULT_TYPE]) -> UserConversationState:
     """
     Get user state or send error message if no paused conversation.
     
@@ -180,7 +202,7 @@ async def require_paused_conversation(update: Update, context: ContextTypes.DEFA
     return user_state
 
 
-def get_conversation_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
+def get_conversation_id(update: Optional[Update], context: Optional[ContextTypes.DEFAULT_TYPE]) -> str:
     """
     Get conversation ID from user state.
     
@@ -219,11 +241,12 @@ async def require_conversation_id(update: Update, context: ContextTypes.DEFAULT_
     try:
         return get_conversation_id(update, context)
     except ConversationNotFoundError:
-        await update.message.reply_text(Messages.NO_CONVERSATION_FOUND)
+        if update and getattr(update, 'message', None):
+            await update.message.reply_text(Messages.NO_CONVERSATION_FOUND)
         raise
 
 
-def get_user_data(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str, default: Any = None) -> Any:
+def get_user_data(update: Optional[Update], context: Optional[ContextTypes.DEFAULT_TYPE], key: str, default: Any = None) -> Any:
     """
     Get user data from context.
     
@@ -236,10 +259,12 @@ def get_user_data(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str, 
     Returns:
         User data value
     """
+    if not context or not hasattr(context, 'user_data') or context.user_data is None:
+        return default
     return context.user_data.get(key, default)
 
 
-def set_user_data(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str, value: Any) -> None:
+def set_user_data(update: Optional[Update], context: Optional[ContextTypes.DEFAULT_TYPE], key: str, value: Any) -> None:
     """
     Set user data in context.
     
@@ -249,10 +274,12 @@ def set_user_data(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str, 
         key: Data key
         value: Data value
     """
+    if not context or not hasattr(context, 'user_data') or context.user_data is None:
+        return
     context.user_data[key] = value
 
 
-def clear_user_data(update: Update, context: ContextTypes.DEFAULT_TYPE, *keys: str) -> None:
+def clear_user_data(update: Optional[Update], context: Optional[ContextTypes.DEFAULT_TYPE], *keys: str) -> None:
     """
     Clear user data from context.
     
@@ -261,6 +288,9 @@ def clear_user_data(update: Update, context: ContextTypes.DEFAULT_TYPE, *keys: s
         context: Bot context
         *keys: Keys to clear (if none provided, clears all)
     """
+    if not context or not hasattr(context, 'user_data') or context.user_data is None:
+        return
+
     if keys:
         for key in keys:
             context.user_data.pop(key, None)
@@ -268,7 +298,7 @@ def clear_user_data(update: Update, context: ContextTypes.DEFAULT_TYPE, *keys: s
         context.user_data.clear()
 
 
-def get_bot_data(context: ContextTypes.DEFAULT_TYPE, key: str, default: Any = None) -> Any:
+def get_bot_data(context: Optional[ContextTypes.DEFAULT_TYPE], key: str, default: Any = None) -> Any:
     """
     Get bot data from context.
     
@@ -280,10 +310,12 @@ def get_bot_data(context: ContextTypes.DEFAULT_TYPE, key: str, default: Any = No
     Returns:
         Bot data value
     """
+    if not context or not hasattr(context, 'bot_data') or context.bot_data is None:
+        return default
     return context.bot_data.get(key, default)
 
 
-def set_bot_data(context: ContextTypes.DEFAULT_TYPE, key: str, value: Any) -> None:
+def set_bot_data(context: Optional[ContextTypes.DEFAULT_TYPE], key: str, value: Any) -> None:
     """
     Set bot data in context.
     
@@ -292,6 +324,8 @@ def set_bot_data(context: ContextTypes.DEFAULT_TYPE, key: str, value: Any) -> No
         key: Data key
         value: Data value
     """
+    if not context or not hasattr(context, 'bot_data') or context.bot_data is None:
+        return
     context.bot_data[key] = value
 
 
@@ -373,7 +407,7 @@ def set_selected_topic(update: Update, context: ContextTypes.DEFAULT_TYPE, topic
     set_user_data(update, context, 'selected_topic', topic)
 
 
-def clear_conversation_data(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+def clear_conversation_data(update: Optional[Update], context: Optional[ContextTypes.DEFAULT_TYPE]) -> None:
     """
     Clear conversation-related user data.
     
@@ -384,7 +418,7 @@ def clear_conversation_data(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     clear_user_data(update, context, 'waiting_for_topic', 'selected_preset', 'selected_topic')
 
 
-def get_message_text(update: Update) -> str:
+def get_message_text(update: Optional[Update]) -> str:
     """
     Get message text from update.
     
@@ -394,15 +428,15 @@ def get_message_text(update: Update) -> str:
     Returns:
         Message text
     """
-    if update.message and update.message.text:
+    if update and getattr(update, 'message', None) and update.message.text:
         return update.message.text.strip()
-    elif update.callback_query and update.callback_query.data:
+    if update and getattr(update, 'callback_query', None) and update.callback_query.data:
         return update.callback_query.data
     else:
         return ""
 
 
-def get_callback_data(update: Update) -> Optional[str]:
+def get_callback_data(update: Optional[Update]) -> Optional[str]:
     """
     Get callback data from update.
     
@@ -412,12 +446,12 @@ def get_callback_data(update: Update) -> Optional[str]:
     Returns:
         Callback data or None
     """
-    if update.callback_query:
+    if update and getattr(update, 'callback_query', None):
         return update.callback_query.data
     return None
 
 
-def is_callback_query(update: Update) -> bool:
+def is_callback_query(update: Optional[Update]) -> bool:
     """
     Check if update is a callback query.
     
@@ -427,10 +461,10 @@ def is_callback_query(update: Update) -> bool:
     Returns:
         True if update is a callback query
     """
-    return update.callback_query is not None
+    return bool(update and getattr(update, 'callback_query', None))
 
 
-def is_text_message(update: Update) -> bool:
+def is_text_message(update: Optional[Update]) -> bool:
     """
     Check if update is a text message.
     
@@ -440,10 +474,10 @@ def is_text_message(update: Update) -> bool:
     Returns:
         True if update is a text message
     """
-    return update.message is not None and update.message.text is not None
+    return bool(update and getattr(update, 'message', None) and update.message.text is not None)
 
 
-def get_user_info(update: Update) -> dict:
+def get_user_info(update: Optional[Update]) -> Optional[dict]:
     """
     Get user information from update.
     
@@ -453,14 +487,14 @@ def get_user_info(update: Update) -> dict:
     Returns:
         Dictionary with user information
     """
+    if not update or not getattr(update, 'effective_user', None):
+        return None
+
     user = update.effective_user
-    if not user:
-        return {}
-    
     return {
-        'id': str(user.id),
-        'username': user.username,
-        'first_name': user.first_name,
-        'last_name': user.last_name,
-        'full_name': f"{user.first_name or ''} {user.last_name or ''}".strip()
+        'id': user.id,
+        'username': getattr(user, 'username', None),
+        'first_name': getattr(user, 'first_name', None),
+        'last_name': getattr(user, 'last_name', None),
+        'full_name': f"{getattr(user, 'first_name', '') or ''} {getattr(user, 'last_name', '') or ''}".strip() or None,
     }

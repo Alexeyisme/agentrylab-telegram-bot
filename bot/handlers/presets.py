@@ -3,6 +3,8 @@ Preset selection handlers for the Telegram bot.
 """
 
 import logging
+from types import SimpleNamespace
+
 from telegram import Update, CallbackQuery
 from telegram.ext import ContextTypes
 
@@ -19,7 +21,15 @@ from ..keyboards.presets import (
 )
 from ..services.preset_service import PresetService
 from ..templates.messages import MessageTemplates
-from ..utils.context_helpers import require_adapter, get_user_id
+from ..states.conversation import ConversationState
+from ..utils.context_helpers import (
+    clear_user_data,
+    get_state_manager,
+    get_user_id,
+    require_adapter,
+    set_user_data,
+    set_user_waiting_for_topic,
+)
 from ..utils.error_handling import handle_errors
 
 logger = logging.getLogger(__name__)
@@ -34,7 +44,6 @@ async def show_presets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         update: Telegram update object
         context: Bot context
     """
-    # Get adapter using new utility
     adapter = await require_adapter(update, context)
     
     # Create preset service
@@ -69,6 +78,12 @@ async def show_presets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         parse_mode='Markdown',
         reply_markup=keyboard
     )
+
+    user_id = get_user_id(update)
+    if user_id:
+        state_manager = get_state_manager(context)
+        state_manager.set_user_state(user_id, ConversationState.SELECTING_PRESET)
+        set_user_waiting_for_topic(update, context, False)
 
 
 async def handle_preset_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -253,8 +268,16 @@ async def use_example_topic(query: CallbackQuery, context: ContextTypes.DEFAULT_
     )
     
     # Store topic in context for conversation start
-    context.user_data['selected_preset'] = preset_id
-    context.user_data['selected_topic'] = topic
+    set_user_data(query, context, 'selected_preset', preset_id)
+    set_user_data(query, context, 'selected_topic', topic)
+
+    user_id = get_user_id(query)
+    if user_id:
+        state_manager = get_state_manager(context)
+        state_manager.set_user_state(user_id, ConversationState.CONFIRMING_TOPIC)
+        state_manager.set_user_preset(user_id, preset_id)
+        state_manager.set_user_topic(user_id, topic)
+    set_user_waiting_for_topic(query, context, False)
 
 
 @handle_errors("Error starting topic input.")
@@ -289,8 +312,14 @@ async def start_custom_topic_input(query: CallbackQuery, context: ContextTypes.D
     )
     
     # Set state for topic input
-    context.user_data['waiting_for_topic'] = True
-    context.user_data['selected_preset'] = preset_id
+    set_user_data(query, context, 'selected_preset', preset_id)
+    set_user_waiting_for_topic(query, context, True)
+
+    user_id = get_user_id(query)
+    if user_id:
+        state_manager = get_state_manager(context)
+        state_manager.set_user_preset(user_id, preset_id)
+        state_manager.set_user_state(user_id, ConversationState.ENTERING_TOPIC)
 
 
 @handle_errors("Error starting conversation. Please try again.")
@@ -309,41 +338,38 @@ async def start_conversation(query: CallbackQuery, context: ContextTypes.DEFAULT
         await query.edit_message_text(Messages.NO_TOPIC_SELECTED)
         return
     
-    # Get adapter using new utility
+    # Get adapter using new utility (also validates bot initialization)
     adapter = await require_adapter(query, context)
-    
-    # Get user ID using new utility
-    user_id = get_user_id(query)
-    
-    # Create preset service
+
+    # Create preset service to populate display text
     preset_service = PresetService(adapter)
-    
-    # Get preset information using service
     preset_info = await preset_service.get_preset_info(preset_id)
-    
-    # Show starting message using template
-    message = MessageTemplates.conversation_starting_message(
+
+    start_message = MessageTemplates.conversation_starting_message(
         emoji=preset_info['emoji'],
         display_name=preset_info['display_name'],
         topic=topic
     )
-    
-    await query.edit_message_text(
-        message,
-        parse_mode='Markdown'
+    await query.edit_message_text(start_message, parse_mode='Markdown')
+
+    # Kick off the actual conversation flow using the conversation handlers
+    from . import conversation as conversation_handlers
+    mock_update = SimpleNamespace(
+        message=query.message,
+        callback_query=query,
+        effective_user=query.from_user,
+        effective_chat=query.message.chat if query.message else None,
     )
-    
-    # Start the conversation (this will be implemented in conversation handler)
-    # For now, just show a placeholder
-    await query.message.reply_text(
-        MessageTemplates.conversation_started_message(),
-        parse_mode='Markdown'
+
+    conversation_id = await conversation_handlers.start_conversation_with_agentrylab(
+        mock_update,
+        context,
+        preset_id,
+        topic,
     )
-    
-    # Clear user data
-    context.user_data.pop('waiting_for_topic', None)
-    context.user_data.pop('selected_preset', None)
-    context.user_data.pop('selected_topic', None)
+
+    set_user_waiting_for_topic(query, context, False)
+    clear_user_data(query, context, 'waiting_for_topic', 'selected_preset', 'selected_topic')
 
 
 @handle_errors("Error retrieving presets. Please try again later.")

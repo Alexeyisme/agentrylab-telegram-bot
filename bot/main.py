@@ -1,10 +1,20 @@
-"""
-Main entry point for the AgentryLab Telegram Bot.
+"""Backward compatible entry point exposing key handler modules."""
 
-This module provides backward compatibility with the old main.py structure.
-"""
+from .app import main  # noqa: F401
+from .handlers import commands, callbacks, messages, presets, conversation  # noqa: F401
 
-from .app import main
+# Placeholder adapter reference used by tests that patch bot.main.adapter
+adapter = None
+
+__all__ = [
+    "main",
+    "commands",
+    "callbacks",
+    "messages",
+    "presets",
+    "conversation",
+    "adapter",
+]
 
 if __name__ == "__main__":
     main()

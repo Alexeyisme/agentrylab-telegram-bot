@@ -6,14 +6,16 @@ and ensure consistent formatting across all bot interactions.
 """
 
 from typing import List, Optional
+
 from ..constants import Messages, Emojis
+from ..utils.validation import sanitize_text
 
 
 class MessageTemplates:
     """Collection of message templates for consistent formatting."""
     
     @staticmethod
-    def welcome_message(user_name: str) -> str:
+    def welcome_message(user_name: Optional[str]) -> str:
         """
         Generate welcome message for new users.
         
@@ -23,9 +25,13 @@ class MessageTemplates:
         Returns:
             Formatted welcome message
         """
+        safe_name = sanitize_text(user_name) if user_name else "there"
+        if not safe_name:
+            safe_name = "there"
+
         return f"""{Messages.WELCOME_TITLE}
 
-{Messages.WELCOME_DESCRIPTION.format(name=user_name)}
+{Messages.WELCOME_DESCRIPTION.format(name=safe_name)}
 
 {Messages.WELCOME_FEATURES}
 

@@ -17,7 +17,9 @@ sys.path.append(os.path.abspath(os.path.join(current_dir, os.pardir)))
 from config import BOT_TOKEN, LOG_LEVEL, LOG_FILE, POLLING, WEBHOOK_URL, WEBHOOK_PORT
 from .registry import services
 from .states.conversation import ConversationStateManager
-from .handlers import commands, callbacks, messages
+from .handlers import commands, callbacks, messages, presets, conversation
+from .utils.agentrylab_patches import patch_telegram_adapter_streaming
+from .handlers import callback_router
 
 # Configure logging
 logging.basicConfig(
@@ -34,6 +36,7 @@ def main() -> None:
     
     # Initialize AgentryLab adapter
     try:
+        patch_telegram_adapter_streaming()
         adapter = TelegramAdapter()
         logger.info("AgentryLab adapter initialized successfully")
     except Exception as e:
@@ -46,6 +49,10 @@ def main() -> None:
     
     # Create application
     application = Application.builder().token(BOT_TOKEN).build()
+
+    # Share core services with handlers via bot_data
+    application.bot_data["adapter"] = adapter
+    application.bot_data["state_manager"] = state_manager
     
     # Set up handlers
     setup_handlers(application)
@@ -74,7 +81,7 @@ def setup_handlers(application: Application) -> None:
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, messages.handle_message))
     
     # Callback handlers
-    application.add_handler(CallbackQueryHandler(callbacks.handle_callback))
+    application.add_handler(CallbackQueryHandler(callback_router.handle_callback_query))
     
     # Error handler
     application.add_error_handler(error_handler)

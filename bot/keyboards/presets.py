@@ -46,7 +46,7 @@ def create_preset_selection_keyboard(presets: List[str], preset_info: Dict[str, 
                     emoji = info.get('emoji', '🤖')
                     display_name = info.get('display_name', preset_id.replace('_', ' ').title())
                     button_text = f"{emoji} {display_name}"
-                    row.append(InlineKeyboardButton(button_text, callback_data=f"select_{preset_id}"))
+                    row.append(InlineKeyboardButton(button_text, callback_data=f"preset_{preset_id}"))
             keyboard.append(row)
     
     # Add navigation buttons

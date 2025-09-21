@@ -10,6 +10,7 @@ services:
       - BOT_TOKEN=${BOT_TOKEN}
       - BOT_USERNAME=${BOT_USERNAME}
       - AGENTRYLAB_PATH=${AGENTRYLAB_PATH:-/app/agentrylab}
+      - AGENTRYLAB_PRESETS_PATH=${AGENTRYLAB_PRESETS_PATH:-}
       - PYTHONPATH=/app
       
       # Logging
@@ -19,6 +20,10 @@ services:
       - POLLING=${POLLING:-true}
       - WEBHOOK_URL=${WEBHOOK_URL:-}
       - WEBHOOK_PORT=${WEBHOOK_PORT:-8443}
+      
+      # Providers
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_ORGANIZATION=${OPENAI_ORGANIZATION:-}
       
       # Security
       - PYTHONUNBUFFERED=1

@@ -7,10 +7,12 @@ separating it from the presentation layer (handlers).
 
 import logging
 import asyncio
+from pathlib import Path
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone
 
 from ..constants import ConversationStates, EventTypes, Roles
+from ..config import AGENTRYLAB_PRESETS_PATH
 from ..states.conversation import ConversationStateManager, UserConversationState
 from ..utils.error_handling import BotError, UserNotActiveError, ConversationNotFoundError
 
@@ -70,10 +72,11 @@ class ConversationService:
             self.state_manager.set_user_state(user_id, ConversationStates.STARTING_CONVERSATION)
             self.state_manager.set_user_preset(user_id, preset_id)
             self.state_manager.set_user_topic(user_id, topic)
-            
+
             # Start conversation with AgentryLab
+            preset_config = self._resolve_preset_config(preset_id)
             conversation_id = self.adapter.start_conversation(
-                preset_id=preset_id,
+                preset_id=preset_config,
                 topic=topic,
                 user_id=user_id
             )
@@ -93,6 +96,49 @@ class ConversationService:
             logger.error(f"Error starting conversation for user {user_id}: {e}")
             self.state_manager.set_user_state(user_id, ConversationStates.ERROR)
             raise BotError(f"Failed to start conversation: {e}")
+
+    def _resolve_preset_config(self, preset_id: str) -> str:
+        """Resolve a preset identifier into a loadable config path."""
+        path_candidate = Path(preset_id)
+
+        if path_candidate.is_file():
+            return str(path_candidate)
+
+        # Build possible filenames (debates -> debates.yaml)
+        candidate_names = []
+        if path_candidate.suffix:
+            candidate_names.append(path_candidate.name)
+        else:
+            candidate_names.append(f"{path_candidate.name}.yaml")
+            candidate_names.append(f"{path_candidate.name}.yml")
+
+        # Check relative to provided path
+        for name in candidate_names:
+            local_candidate = path_candidate.parent / name
+            if local_candidate.is_file():
+                return str(local_candidate)
+
+        # Check configured presets directory if provided
+        if AGENTRYLAB_PRESETS_PATH:
+            base = Path(AGENTRYLAB_PRESETS_PATH)
+            for name in candidate_names:
+                candidate_path = base / name
+                if candidate_path.is_file():
+                    return str(candidate_path)
+
+        # Fall back to packaged presets
+        try:
+            from agentrylab import presets as packaged_presets
+
+            for name in candidate_names:
+                packaged_path = packaged_presets.path(name)
+                if packaged_path and Path(packaged_path).is_file():
+                    return str(packaged_path)
+        except Exception as exc:
+            logger.debug("Failed to resolve packaged preset for %s: %s", preset_id, exc)
+
+        # As a last resort, return the original identifier (adapter will raise)
+        return str(preset_id)
     
     async def pause_conversation(self, user_id: str) -> None:
         """
@@ -314,6 +360,13 @@ class ConversationService:
             content = event.content
             agent_id = event.agent_id
             role = event.role
+            preview = content[:120] + "…" if isinstance(content, str) and len(content) > 120 else content
+            logger.debug(
+                "Streaming event type=%s role=%s content=%r",
+                event_type,
+                role,
+                preview,
+            )
             
             # Handle different event types
             if event_type == EventTypes.CONVERSATION_STARTED:
@@ -328,7 +381,8 @@ class ConversationService:
                 elif role == Roles.SUMMARIZER:
                     event_type = EventTypes.SUMMARY_UPDATE
                 
-                await event_handler(event_type, content, agent_id, role)
+                if content:
+                    await event_handler(event_type, content, agent_id, role)
                 
             elif event_type == EventTypes.USER_TURN:
                 # Update user state to waiting for input

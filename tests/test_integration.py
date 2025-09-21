@@ -7,7 +7,19 @@ import asyncio
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from telegram import Update, User, Message, Chat, CallbackQuery
 
-from bot.handlers import commands, callbacks, messages
+from bot.handlers import commands, callbacks, messages, conversation, presets
+from bot.handlers.commands import (
+    start_command,
+    help_command,
+    presets_command,
+    status_command,
+    pause_command,
+    resume_command,
+    stop_command,
+)
+from bot.handlers.messages import handle_message
+from bot.handlers.callbacks import handle_callback_query
+from bot.states.conversation import ConversationState, ConversationStateManager
 from bot.state import state
 from bot.registry import services
 from tests.factories.test_data import TestDataFactory

@@ -9,6 +9,7 @@ from telegram.ext import ContextTypes
 from ..config import PREFIX_SELECT, PREFIX_INFO, PREFIX_EXAMPLES, PREFIX_CUSTOM, PREFIX_CONFIRM
 from ..services import services
 from ..constants import ConversationStates
+from ..utils.context_helpers import get_state_manager
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +47,9 @@ async def handle_preset_selection(query: CallbackQuery, context: ContextTypes.DE
     user_id = str(query.from_user.id)
     
     # Store selected preset
-    services.state_manager.set_user_preset(user_id, preset_id)
-    services.state_manager.set_user_state(user_id, ConversationStates.ENTERING_TOPIC)
+    state_manager = get_state_manager(context)
+    state_manager.set_user_preset(user_id, preset_id)
+    state_manager.set_user_state(user_id, ConversationStates.ENTERING_TOPIC)
     
     # Ask for topic
     await query.edit_message_text(
@@ -102,8 +104,9 @@ async def handle_custom_topic(query: CallbackQuery, context: ContextTypes.DEFAUL
     user_id = str(query.from_user.id)
     
     # Store selected preset
-    services.state_manager.set_user_preset(user_id, preset_id)
-    services.state_manager.set_user_state(user_id, ConversationStates.ENTERING_TOPIC)
+    state_manager = get_state_manager(context)
+    state_manager.set_user_preset(user_id, preset_id)
+    state_manager.set_user_state(user_id, ConversationStates.ENTERING_TOPIC)
     
     # Ask for topic
     await query.edit_message_text(
@@ -127,12 +130,13 @@ async def handle_topic_confirmation(query: CallbackQuery, context: ContextTypes.
     
     # Start conversation
     try:
+        state_manager = get_state_manager(context)
         conversation_service = services.get_conversation_service()
         conversation_id = await conversation_service.start_conversation(user_id, preset_id, topic)
         
         # Update user state
-        services.state_manager.set_user_conversation_id(user_id, conversation_id)
-        services.state_manager.set_user_state(user_id, ConversationStates.IN_CONVERSATION)
+        state_manager.set_user_conversation_id(user_id, conversation_id)
+        state_manager.set_user_state(user_id, ConversationStates.IN_CONVERSATION)
         
         await query.edit_message_text(
             f"🚀 **Conversation Started!**\n\n"
@@ -145,3 +149,13 @@ async def handle_topic_confirmation(query: CallbackQuery, context: ContextTypes.
     except Exception as e:
         logger.error(f"Error starting conversation: {e}")
         await query.edit_message_text("❌ Error starting conversation. Please try again.")
+
+
+async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Legacy wrapper that forwards to preset handlers."""
+    from . import presets as preset_handlers
+
+    if update and update.callback_query and update.callback_query.data:
+        await handle_callback(update, context)
+    else:
+        await preset_handlers.handle_preset_callback(update, context)

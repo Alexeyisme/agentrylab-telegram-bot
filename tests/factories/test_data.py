@@ -8,7 +8,7 @@ reducing code duplication in tests and improving maintainability.
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
-from unittest.mock import Mock
+from unittest.mock import Mock, AsyncMock
 
 from bot.constants import ConversationStates, EventTypes, Roles, Emojis, PresetCategories
 from bot.states.conversation import UserConversationState
@@ -231,6 +231,11 @@ class TestDataFactory:
             agent_id=agent_id,
             role=role
         )
+
+    @staticmethod
+    def create_mock_conversation_event(**kwargs) -> MockConversationEvent:
+        """Backward compatible alias for conversation event factory."""
+        return TestDataFactory.create_conversation_event(**kwargs)
     
     @staticmethod
     def create_conversation_state(
@@ -269,6 +274,36 @@ class TestDataFactory:
             status=status,
             metadata=metadata
         )
+
+    @staticmethod
+    def create_mock_conversation_state(**kwargs) -> MockConversationState:
+        """Backward compatible alias for conversation state factory."""
+        return TestDataFactory.create_conversation_state(**kwargs)
+
+    @staticmethod
+    def create_mock_conversation_analytics(
+        conversation_id: Optional[str] = None,
+        preset_id: Optional[str] = None,
+        topic: Optional[str] = None,
+        user_id: Optional[str] = None,
+        total_messages: int = 5,
+    ) -> Dict[str, Any]:
+        """Create mock analytics data."""
+        now = datetime.now(timezone.utc)
+        return {
+            'conversation_id': conversation_id or TestDataFactory.create_conversation_id(),
+            'preset_id': preset_id or TestDataFactory.create_preset_id(),
+            'topic': topic or TestDataFactory.create_topic(),
+            'user_id': user_id or TestDataFactory.create_user_id(),
+            'start_time': now,
+            'end_time': now,
+            'total_messages': total_messages,
+            'user_messages': max(total_messages - 1, 0),
+            'agent_messages': max(1, total_messages - 1),
+            'status': MockConversationStatus.ACTIVE,
+            'duration_seconds': max(total_messages * 3, 1),
+            'duration_minutes': max(total_messages // 2, 1),
+        }
     
     @staticmethod
     def create_mock_update(
@@ -304,26 +339,25 @@ class TestDataFactory:
         
         update.effective_user = user
         
-        if message_text:
-            # Create mock message
-            message = Mock()
-            message.text = message_text
-            message.reply_text = Mock()
-            update.message = message
-            update.callback_query = None
-        elif callback_data:
+        # Create mock message for convenience (even if no text yet)
+        message = Mock()
+        message.text = message_text
+        message.reply_text = AsyncMock()
+        update.message = message
+
+        if callback_data:
             # Create mock callback query
             callback_query = Mock()
             callback_query.data = callback_data
             callback_query.from_user = user
-            callback_query.answer = Mock()
-            callback_query.edit_message_text = Mock()
+            callback_query.answer = AsyncMock()
+            callback_query.edit_message_text = AsyncMock()
+            callback_query.message = Mock()
+            callback_query.message.reply_text = AsyncMock()
             update.callback_query = callback_query
-            update.message = None
         else:
-            update.message = None
             update.callback_query = None
-        
+
         return update
     
     @staticmethod

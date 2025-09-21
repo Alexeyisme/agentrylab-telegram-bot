@@ -11,6 +11,10 @@ BOT_USERNAME = os.getenv("BOT_USERNAME", "your_bot_username")
 
 # AgentryLab Configuration
 AGENTRYLAB_PATH = os.getenv("AGENTRYLAB_PATH", "/app/agentrylab")
+AGENTRYLAB_PRESETS_PATH = os.getenv(
+    "AGENTRYLAB_PRESETS_PATH",
+    os.path.join(AGENTRYLAB_PATH, "presets"),
+)
 
 # Server Configuration
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
@@ -28,9 +32,23 @@ MAX_CONVERSATIONS_PER_USER = 3
 
 # Messages
 WELCOME_MSG = "🤖 **Welcome to AgentryLab!**\n\nHi {name}! I'm your gateway to multi-agent conversations.\n\nUse /start to begin!"
-HELP_MSG = "🤖 **AgentryLab Bot Help**\n\n**Commands:**\n/start - Start a new conversation\n/help - Show this help\n/status - Check your current status\n\n**Features:**\n• Multi-agent conversations\n• Real-time streaming\n• Interactive controls"
+HELP_MSG = (
+    "🤖 **AgentryLab Bot Help**\n\n"
+    "**Commands:**\n"
+    "/start - Start a new conversation\n"
+    "/help - Show this help\n"
+    "/presets - List available conversation types\n"
+    "/status - Check your current status\n"
+    "/pause - Pause an active conversation\n"
+    "/resume - Resume a paused conversation\n"
+    "/stop - Stop the current conversation\n"
+    "\n**Features:**\n"
+    "• Multi-agent conversations\n"
+    "• Real-time streaming\n"
+    "• Interactive controls"
+)
 ERROR_MSG = "❌ An error occurred. Please try again later."
-NO_CONVERSATION_MSG = "❌ You don't have an active conversation."
+NO_CONVERSATION_MSG = "❌ You have no active conversations."
 
 # Callback Prefixes
 PREFIX_SELECT = "select_"

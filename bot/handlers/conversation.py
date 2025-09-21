@@ -13,20 +13,22 @@ from ..constants import Messages, ConversationStates
 from ..keyboards.presets import create_topic_confirmation_keyboard
 from ..services.conversation_service import ConversationService
 from ..services.preset_service import PresetService
-from ..states.conversation import ConversationState, ConversationStateManager
+from ..states.conversation import ConversationState
 from ..templates.messages import MessageTemplates
 from ..utils.context_helpers import (
-    get_user_id, get_user_data, set_user_data, clear_user_data,
-    is_user_waiting_for_topic, get_selected_preset, get_selected_topic
+    get_user_id,
+    get_user_data,
+    set_user_data,
+    clear_user_data,
+    is_user_waiting_for_topic,
+    get_selected_preset,
+    get_selected_topic,
+    get_state_manager,
 )
 from ..utils.error_handling import handle_errors
 from ..utils.validation import validate_topic_input
 
 logger = logging.getLogger(__name__)
-
-# Global state manager
-state_manager = ConversationStateManager()
-
 
 @handle_errors("Error processing your topic. Please try again.")
 async def handle_topic_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -38,14 +40,23 @@ async def handle_topic_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context: Bot context
     """
     user_id = get_user_id(update)
+    state_manager = get_state_manager(context)
     message_text = update.message.text.strip()
     
     # Check if user is waiting for topic input using new utility
-    if not is_user_waiting_for_topic(update, context):
+    user_state = state_manager.get_user_state(user_id)
+    waiting_for_topic = is_user_waiting_for_topic(update, context)
+    expecting_topic = user_state.state in {
+        ConversationState.SELECTING_PRESET,
+        ConversationState.ENTERING_TOPIC,
+        ConversationState.CONFIRMING_TOPIC,
+    }
+
+    if not waiting_for_topic and not expecting_topic:
         # User is not in topic input mode, handle as regular message
         await handle_regular_message(update, context)
         return
-    
+
     # Validate topic input
     validation_result = validate_topic_input(message_text)
     if not validation_result['valid']:
@@ -93,7 +104,7 @@ async def handle_topic_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     # Clear waiting state using new utility
     set_user_data(update, context, 'waiting_for_topic', False)
-    
+
     # Update user state
     state_manager.set_user_state(user_id, ConversationState.CONFIRMING_TOPIC)
     state_manager.set_user_preset(user_id, preset_id)
@@ -110,7 +121,8 @@ async def handle_regular_message(update: Update, context: ContextTypes.DEFAULT_T
         context: Bot context
     """
     user_id = get_user_id(update)
-    
+    state_manager = get_state_manager(context)
+
     # Check if user is in a conversation
     if state_manager.is_user_in_conversation(user_id):
         # User is in conversation, handle as conversation input
@@ -134,6 +146,7 @@ async def handle_conversation_input(update: Update, context: ContextTypes.DEFAUL
         context: Bot context
     """
     user_id = get_user_id(update)
+    state_manager = get_state_manager(context)
     message_text = update.message.text.strip()
     
     # Get user state
@@ -197,6 +210,7 @@ async def start_conversation_with_agentrylab(update: Update, context: ContextTyp
         Conversation ID if successful, None otherwise
     """
     user_id = get_user_id(update)
+    state_manager = get_state_manager(context)
     
     # Get adapter and create conversation service
     from ..utils.context_helpers import require_adapter
@@ -228,6 +242,7 @@ async def stream_conversation_events(update: Update, context: ContextTypes.DEFAU
         conversation_id: The conversation ID
     """
     user_id = get_user_id(update)
+    state_manager = get_state_manager(context)
     
     try:
         # Get adapter and create conversation service
@@ -253,13 +268,22 @@ async def stream_conversation_events(update: Update, context: ContextTypes.DEFAU
                 # Update user state
                 state_manager.set_user_state(user_id, ConversationState.CONVERSATION_ENDED)
             elif event_type == "error":
-                message = f"❌ **Error:** {content}"
+                if content and "401" in content:
+                    message = (
+                        "❌ **OpenAI authentication failed.** Please double-check the `OPENAI_API_KEY` in your"
+                        " server `.env` and redeploy with a valid key."
+                    )
+                else:
+                    message = f"❌ **Error:** {content}"
                 state_manager.set_user_state(user_id, ConversationState.ERROR)
             else:
-                # Unknown event type, just show content
-                message = f"📢 {content}"
+                # Unknown event type, just show content when available
+                message = f"📢 {content}" if content else ""
             
             # Send message to user
+            if not message:
+                return
+
             try:
                 await update.message.reply_text(message, parse_mode='Markdown')
             except Exception as e:
@@ -296,9 +320,14 @@ async def pause_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context: Bot context
     """
     user_id = get_user_id(update)
-    
+    state_manager = get_state_manager(context)
+
     # Check if user is in conversation
-    if not state_manager.is_user_in_conversation(user_id):
+    user_state = state_manager.get_user_state(user_id)
+    if not user_state.is_in_conversation():
+        await update.message.reply_text(Messages.NO_CONVERSATION_TO_PAUSE)
+        return
+    if not user_state.conversation_id:
         await update.message.reply_text(Messages.NO_CONVERSATION_TO_PAUSE)
         return
     
@@ -327,10 +356,14 @@ async def resume_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE
         context: Bot context
     """
     user_id = get_user_id(update)
-    
+    state_manager = get_state_manager(context)
+
     # Check if user has a paused conversation
     user_state = state_manager.get_user_state(user_id)
     if user_state.state != ConversationState.CONVERSATION_PAUSED:
+        await update.message.reply_text(Messages.NO_PAUSED_CONVERSATION)
+        return
+    if not user_state.conversation_id:
         await update.message.reply_text(Messages.NO_PAUSED_CONVERSATION)
         return
     
@@ -359,9 +392,14 @@ async def stop_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         context: Bot context
     """
     user_id = get_user_id(update)
-    
+    state_manager = get_state_manager(context)
+
     # Check if user is in conversation
-    if not state_manager.is_user_in_conversation(user_id):
+    user_state = state_manager.get_user_state(user_id)
+    if not user_state.is_in_conversation():
+        await update.message.reply_text(Messages.NO_CONVERSATION_TO_STOP)
+        return
+    if not user_state.conversation_id:
         await update.message.reply_text(Messages.NO_CONVERSATION_TO_STOP)
         return
     
