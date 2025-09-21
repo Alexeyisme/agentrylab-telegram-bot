@@ -49,7 +49,7 @@ if [ ! -f .env ]; then
     if [ -f env.example ]; then
         cp env.example .env
         print_warning "Please edit .env file with your configuration before running again."
-        print_status "Required: BOT_TOKEN, BOT_USERNAME, AGENTRYLAB_PATH"
+        print_status "Required: BOT_TOKEN, BOT_USERNAME"
         exit 1
     else
         print_error "env.example file not found. Cannot create .env file."
@@ -64,13 +64,8 @@ mkdir -p logs data ssl
 # Set proper permissions
 chmod 755 logs data ssl
 
-# Check if AgentryLab path exists
-AGENTRYLAB_PATH=$(grep AGENTRYLAB_PATH .env | cut -d '=' -f2)
-if [ ! -d "$AGENTRYLAB_PATH" ]; then
-    print_warning "AgentryLab path '$AGENTRYLAB_PATH' does not exist."
-    print_status "Please update AGENTRYLAB_PATH in .env file to point to your AgentryLab installation."
-    exit 1
-fi
+# AgentryLab is now installed from PyPI, no path check needed
+print_status "AgentryLab will be installed from PyPI during Docker build..."
 
 # Build and start the bot
 print_status "Building Docker image..."
