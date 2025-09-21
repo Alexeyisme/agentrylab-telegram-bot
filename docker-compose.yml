@@ -27,8 +27,6 @@ services:
       - ./logs:/app/logs
       # Persist conversation data
       - ./data:/app/data
-      # Mount AgentryLab (if external)
-      - ${AGENTRYLAB_PATH}:/app/agentrylab:ro
     ports:
       # Webhook port (only if using webhook mode)
       - "${WEBHOOK_PORT:-8443}:8443"

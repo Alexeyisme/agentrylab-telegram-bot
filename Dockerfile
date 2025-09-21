@@ -10,7 +10,13 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Clone and install AgentryLab
+RUN git clone https://github.com/Alexeyisme/agentrylab.git /app/agentrylab
+WORKDIR /app/agentrylab
+RUN pip install --no-cache-dir -e .
+
 # Copy requirements first (for better caching)
+WORKDIR /app
 COPY requirements.txt .
 
 # Install Python dependencies
