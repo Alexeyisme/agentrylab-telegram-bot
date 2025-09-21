@@ -65,7 +65,8 @@ async def show_presets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         
         # Create simple keyboard
         from ..keyboards.presets import create_preset_selection_keyboard
-        keyboard = create_preset_selection_keyboard(presets)
+        preset_info = await preset_service.get_preset_info_batch(presets)
+        keyboard = create_preset_selection_keyboard(presets, preset_info)
         
         await update.message.reply_text(
             "🎭 **Choose a conversation type:**",

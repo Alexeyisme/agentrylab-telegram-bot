@@ -100,6 +100,15 @@ class PresetService:
         except Exception as e:
             logger.error(f"Error retrieving preset info for {preset_id}: {e}")
             raise BotError(f"Failed to retrieve preset information for {preset_id}: {e}")
+
+    async def get_preset_examples(self, preset_id: str) -> List[str]:
+        """Expose examples via keyboard helper for callbacks."""
+        try:
+            from ..keyboards.presets import get_preset_examples
+            return get_preset_examples(preset_id)
+        except Exception as e:
+            logger.error(f"Error retrieving examples for {preset_id}: {e}")
+            return []
     
     async def _get_single_preset_info(self, preset_id: str) -> Dict[str, Any]:
         """
