@@ -206,8 +206,11 @@ def get_state_manager(
         # This is a defensive fallback when services module is not available
         # Log the exception for debugging but continue with fallback
         import logging
+
         logger = logging.getLogger(__name__)
-        logger.debug("Services module not available, using fallback state manager", exc_info=True)
+        logger.debug(
+            "Services module not available, using fallback state manager", exc_info=True
+        )
 
     return state_manager
 

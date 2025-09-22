@@ -156,5 +156,8 @@ class AsyncTelegramAdapter(TelegramAdapter):
         except Exception:  # nosec B110 - defensive cleanup in destructor
             # Log the exception for debugging but don't raise it in destructor
             import logging
+
             logger = logging.getLogger(__name__)
-            logger.debug("Exception during adapter cleanup in destructor", exc_info=True)
+            logger.debug(
+                "Exception during adapter cleanup in destructor", exc_info=True
+            )
