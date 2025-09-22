@@ -1,3 +1,4 @@
+# Python 3.11+ required
 # Core dependencies
 python-telegram-bot>=21.0
 asyncio-mqtt==0.16.1
