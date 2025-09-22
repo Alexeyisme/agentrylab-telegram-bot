@@ -19,9 +19,14 @@ The AgentryLab Telegram Bot provides a bridge between Telegram and AgentryLab's 
 - **State management** - Conversation state tracking
 
 ### AgentryLab Integration
-- **TelegramAdapter** - Thin adapter layer
+- **AsyncTelegramAdapter** - Enhanced async adapter layer
 - **Conversation streaming** - Real-time event processing
 - **Preset management** - Conversation type selection
+
+### User Interface
+- **Persistent keyboards** - Always-visible command buttons
+- **Command menus** - Auto-complete when typing `/`
+- **State-aware UI** - Keyboard adapts to user's current state
 
 ## Project Structure
 
@@ -37,7 +42,8 @@ bot/
 │   ├── callbacks.py    # Callback query handlers
 │   └── messages.py     # Message handlers
 ├── keyboards/
-│   └── presets.py      # Inline keyboard generation
+│   ├── presets.py      # Inline keyboard generation
+│   └── reply.py        # Persistent reply keyboards
 └── services/           # Business logic services
     ├── conversation_service.py
     └── preset_service.py

@@ -11,6 +11,7 @@ from telegram.ext import ContextTypes
 
 from ..constants import Messages, ConversationStates
 from ..keyboards.presets import create_topic_confirmation_keyboard
+from ..keyboards.reply import create_main_menu_keyboard
 from ..services.conversation_service import ConversationService
 from ..services.preset_service import PresetService
 from ..states.conversation import ConversationState
@@ -132,7 +133,8 @@ async def handle_regular_message(update: Update, context: ContextTypes.DEFAULT_T
     # User is not in conversation, provide help using template
     await update.message.reply_text(
         MessageTemplates.regular_message_response(),
-        parse_mode='Markdown'
+        parse_mode='Markdown',
+        reply_markup=create_main_menu_keyboard()
     )
 
 

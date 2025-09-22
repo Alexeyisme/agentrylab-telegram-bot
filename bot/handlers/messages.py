@@ -5,6 +5,11 @@ from __future__ import annotations
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from ..keyboards.reply import (
+    is_keyboard_button, 
+    get_command_from_button,
+    create_main_menu_keyboard
+)
 from ..states.conversation import ConversationState
 from ..utils.context_helpers import (
     get_state_manager,
@@ -19,6 +24,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user_id = get_user_id(update)
     if user_id is None:
         return
+
+    # Check if it's a keyboard button press first
+    message_text = update.message.text.strip()
+    if is_keyboard_button(message_text):
+        command = get_command_from_button(message_text)
+        if command:
+            await handle_keyboard_command(update, context, command)
+            return
 
     state_manager = get_state_manager(context)
     user_state = state_manager.get_user_state(user_id)
@@ -39,3 +52,25 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await conversation_handlers.handle_conversation_input(update, context)
     else:
         await conversation_handlers.handle_regular_message(update, context)
+
+
+async def handle_keyboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE, command: str) -> None:
+    """Handle commands triggered by keyboard buttons."""
+    # Import command handlers
+    from . import commands
+    
+    # Route to appropriate command handler
+    if command == "/start":
+        await commands.start_command(update, context)
+    elif command == "/help":
+        await commands.help_command(update, context)
+    elif command == "/status":
+        await commands.status_command(update, context)
+    elif command == "/presets":
+        await commands.presets_command(update, context)
+    elif command == "/pause":
+        await commands.pause_command(update, context)
+    elif command == "/resume":
+        await commands.resume_command(update, context)
+    elif command == "/stop":
+        await commands.stop_command(update, context)

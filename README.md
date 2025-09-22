@@ -12,6 +12,7 @@ A Telegram bot that provides access to AgentryLab's multi-agent conversations th
 - 💬 **Real-time Conversations** - Watch AI agents interact live
 - 👤 **User Participation** - Join conversations when it's your turn
 - 🎮 **Conversation Controls** - Pause, resume, stop conversations
+- 📱 **Always-Visible Commands** - Persistent keyboard with quick access buttons
 - 🔒 **Secure** - Input validation and content filtering
 
 ## Quick Start

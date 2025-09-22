@@ -11,6 +11,7 @@ from telegram.ext import ContextTypes
 from ..config import HELP_MSG, NO_CONVERSATION_MSG, WELCOME_MSG
 from ..services import services
 from ..states.conversation import ConversationState
+from ..keyboards.reply import create_main_menu_keyboard
 from ..utils.context_helpers import (
     clear_user_data,
     get_state_manager,
@@ -48,6 +49,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await update.message.reply_text(
         WELCOME_MSG.format(name=user_name),
         parse_mode="Markdown",
+        reply_markup=create_main_menu_keyboard()
     )
 
     await preset_handlers.show_presets(update, context)
@@ -55,7 +57,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /help command."""
-    await update.message.reply_text(HELP_MSG, parse_mode="Markdown")
+    await update.message.reply_text(
+        HELP_MSG, 
+        parse_mode="Markdown",
+        reply_markup=create_main_menu_keyboard()
+    )
 
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

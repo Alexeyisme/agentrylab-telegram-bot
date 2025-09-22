@@ -8,6 +8,7 @@ import sys
 import os
 
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
+from telegram import BotCommand
 
 # Ensure current and parent directories are in Python path
 current_dir = os.path.dirname(__file__)
@@ -55,6 +56,9 @@ def main() -> None:
     # Set up handlers
     setup_handlers(application)
     
+    # Set up bot commands menu
+    setup_bot_commands(application)
+    
     # Start the bot
     if POLLING:
         logger.info("Starting bot in polling mode...")
@@ -74,6 +78,10 @@ def setup_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("start", commands.start_command))
     application.add_handler(CommandHandler("help", commands.help_command))
     application.add_handler(CommandHandler("status", commands.status_command))
+    application.add_handler(CommandHandler("presets", commands.presets_command))
+    application.add_handler(CommandHandler("pause", commands.pause_command))
+    application.add_handler(CommandHandler("resume", commands.resume_command))
+    application.add_handler(CommandHandler("stop", commands.stop_command))
     
     # Message handlers
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, messages.handle_message))
@@ -83,6 +91,27 @@ def setup_handlers(application: Application) -> None:
     
     # Error handler
     application.add_error_handler(error_handler)
+
+
+def setup_bot_commands(application: Application) -> None:
+    """Set up bot commands menu that appears when users type '/'."""
+    bot_commands = [
+        BotCommand("start", "🚀 Start a new conversation"),
+        BotCommand("help", "❓ Show help and available commands"),
+        BotCommand("presets", "🎭 List available conversation types"),
+        BotCommand("status", "📊 Check your current status"),
+        BotCommand("pause", "⏸️ Pause an active conversation"),
+        BotCommand("resume", "▶️ Resume a paused conversation"),
+        BotCommand("stop", "⏹️ Stop the current conversation"),
+    ]
+    
+    # Set commands when the application starts
+    async def post_init(application):
+        await application.bot.set_my_commands(bot_commands)
+        logger.info("Bot commands menu set successfully")
+    
+    # Register the post_init callback
+    application.post_init = post_init
 
 
 async def error_handler(update, context) -> None:
