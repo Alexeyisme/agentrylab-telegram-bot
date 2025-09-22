@@ -39,7 +39,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     user = update.effective_user
     if not user:
         return
-    
+
     user_id = str(user.id)
     user_name = user.first_name or user.username or "there"
 
@@ -52,11 +52,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     message = update.message
     if not message:
         return
-    
+
     await message.reply_text(
         WELCOME_MSG.format(name=user_name),
         parse_mode="Markdown",
-        reply_markup=create_main_menu_keyboard()
+        reply_markup=create_main_menu_keyboard(),
     )
 
     await preset_handlers.show_presets(update, context)
@@ -67,11 +67,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     message = update.message
     if not message:
         return
-    
+
     await message.reply_text(
-        HELP_MSG, 
-        parse_mode="Markdown",
-        reply_markup=create_main_menu_keyboard()
+        HELP_MSG, parse_mode="Markdown", reply_markup=create_main_menu_keyboard()
     )
 
 
@@ -80,7 +78,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user = update.effective_user
     if not user:
         return
-    
+
     user_id = str(user.id)
     state_manager = _resolve_state_manager(context)
     user_state = state_manager.get_user_state(user_id)
@@ -121,7 +119,7 @@ async def presets_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         message = update.message
         if not message:
             return
-        
+
         await message.reply_text("❌ Error retrieving presets. Please try again.")
 
 
@@ -141,6 +139,7 @@ async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 # Backwards compatibility ----------------------------------------------------
+
 
 async def show_presets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Legacy wrapper retained for older imports/tests."""

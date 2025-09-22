@@ -10,7 +10,7 @@ from typing import List, Optional
 def create_main_menu_keyboard() -> ReplyKeyboardMarkup:
     """
     Create the main persistent keyboard that's always visible.
-    
+
     Returns:
         ReplyKeyboardMarkup with main command buttons
     """
@@ -18,24 +18,21 @@ def create_main_menu_keyboard() -> ReplyKeyboardMarkup:
         [
             KeyboardButton("🚀 Start New"),
             KeyboardButton("🎭 Presets"),
-            KeyboardButton("📊 Status")
+            KeyboardButton("📊 Status"),
         ],
         [
             KeyboardButton("⏸️ Pause"),
             KeyboardButton("▶️ Resume"),
-            KeyboardButton("⏹️ Stop")
+            KeyboardButton("⏹️ Stop"),
         ],
-        [
-            KeyboardButton("❓ Help"),
-            KeyboardButton("ℹ️ About")
-        ]
+        [KeyboardButton("❓ Help"), KeyboardButton("ℹ️ About")],
     ]
-    
+
     return ReplyKeyboardMarkup(
         keyboard,
         resize_keyboard=True,
         one_time_keyboard=False,  # Keep keyboard persistent
-        input_field_placeholder="Type a message or use buttons above..."
+        input_field_placeholder="Type a message or use buttons above...",
     )
 
 
@@ -43,7 +40,7 @@ def create_conversation_control_keyboard() -> ReplyKeyboardMarkup:
     """
     Create a keyboard specifically for conversation control.
     Use this when user is in an active conversation.
-    
+
     Returns:
         ReplyKeyboardMarkup with conversation control buttons
     """
@@ -51,64 +48,41 @@ def create_conversation_control_keyboard() -> ReplyKeyboardMarkup:
         [
             KeyboardButton("⏸️ Pause"),
             KeyboardButton("▶️ Resume"),
-            KeyboardButton("⏹️ Stop")
+            KeyboardButton("⏹️ Stop"),
         ],
-        [
-            KeyboardButton("📊 Status"),
-            KeyboardButton("🎭 New Preset")
-        ],
-        [
-            KeyboardButton("❓ Help")
-        ]
+        [KeyboardButton("📊 Status"), KeyboardButton("🎭 New Preset")],
+        [KeyboardButton("❓ Help")],
     ]
-    
+
     return ReplyKeyboardMarkup(
         keyboard,
         resize_keyboard=True,
         one_time_keyboard=False,
-        input_field_placeholder="Type your message or use controls above..."
+        input_field_placeholder="Type your message or use controls above...",
     )
 
 
 def create_preset_selection_keyboard() -> ReplyKeyboardMarkup:
     """
     Create a keyboard for preset selection.
-    
+
     Returns:
         ReplyKeyboardMarkup with preset selection buttons
     """
     keyboard = [
-        [
-            KeyboardButton("🎭 Debates"),
-            KeyboardButton("🎪 Stand-up")
-        ],
-        [
-            KeyboardButton("🛋️ Therapy"),
-            KeyboardButton("🔬 Research")
-        ],
-        [
-            KeyboardButton("💡 Brainstorm"),
-            KeyboardButton("🤝 Negotiation")
-        ],
-        [
-            KeyboardButton("🎤 Interview"),
-            KeyboardButton("📚 Storytelling")
-        ],
-        [
-            KeyboardButton("👨‍🏫 Teaching"),
-            KeyboardButton("💼 Consulting")
-        ],
-        [
-            KeyboardButton("🔙 Back to Main"),
-            KeyboardButton("❓ Help")
-        ]
+        [KeyboardButton("🎭 Debates"), KeyboardButton("🎪 Stand-up")],
+        [KeyboardButton("🛋️ Therapy"), KeyboardButton("🔬 Research")],
+        [KeyboardButton("💡 Brainstorm"), KeyboardButton("🤝 Negotiation")],
+        [KeyboardButton("🎤 Interview"), KeyboardButton("📚 Storytelling")],
+        [KeyboardButton("👨‍🏫 Teaching"), KeyboardButton("💼 Consulting")],
+        [KeyboardButton("🔙 Back to Main"), KeyboardButton("❓ Help")],
     ]
-    
+
     return ReplyKeyboardMarkup(
         keyboard,
         resize_keyboard=True,
         one_time_keyboard=False,
-        input_field_placeholder="Select a conversation type..."
+        input_field_placeholder="Select a conversation type...",
     )
 
 
@@ -116,32 +90,27 @@ def create_simple_keyboard() -> ReplyKeyboardMarkup:
     """
     Create a simple keyboard with basic commands.
     Use this as a fallback or for minimal interface.
-    
+
     Returns:
         ReplyKeyboardMarkup with basic buttons
     """
     keyboard = [
-        [
-            KeyboardButton("🚀 Start"),
-            KeyboardButton("❓ Help")
-        ],
-        [
-            KeyboardButton("📊 Status")
-        ]
+        [KeyboardButton("🚀 Start"), KeyboardButton("❓ Help")],
+        [KeyboardButton("📊 Status")],
     ]
-    
+
     return ReplyKeyboardMarkup(
         keyboard,
         resize_keyboard=True,
         one_time_keyboard=False,
-        input_field_placeholder="Type a message..."
+        input_field_placeholder="Type a message...",
     )
 
 
 def remove_keyboard() -> ReplyKeyboardRemove:
     """
     Remove the persistent keyboard.
-    
+
     Returns:
         ReplyKeyboardMarkup that removes the keyboard
     """
@@ -151,10 +120,10 @@ def remove_keyboard() -> ReplyKeyboardRemove:
 def get_keyboard_for_state(state: str) -> ReplyKeyboardMarkup:
     """
     Get the appropriate keyboard based on user state.
-    
+
     Args:
         state: Current user state
-        
+
     Returns:
         Appropriate ReplyKeyboardMarkup
     """
@@ -171,36 +140,53 @@ def get_keyboard_for_state(state: str) -> ReplyKeyboardMarkup:
 def is_keyboard_button(text: str) -> bool:
     """
     Check if the text corresponds to a keyboard button.
-    
+
     Args:
         text: Message text to check
-        
+
     Returns:
         True if text is a keyboard button
     """
     keyboard_buttons = {
-        "🚀 Start New", "🎭 Presets", "📊 Status", "⏸️ Pause", "▶️ Resume", "⏹️ Stop",
-        "❓ Help", "ℹ️ About", "🎭 Debates", "🎪 Stand-up", "🛋️ Therapy", "🔬 Research",
-        "💡 Brainstorm", "🤝 Negotiation", "🎤 Interview", "📚 Storytelling", 
-        "👨‍🏫 Teaching", "💼 Consulting", "🔙 Back to Main", "🎭 New Preset", "🚀 Start"
+        "🚀 Start New",
+        "🎭 Presets",
+        "📊 Status",
+        "⏸️ Pause",
+        "▶️ Resume",
+        "⏹️ Stop",
+        "❓ Help",
+        "ℹ️ About",
+        "🎭 Debates",
+        "🎪 Stand-up",
+        "🛋️ Therapy",
+        "🔬 Research",
+        "💡 Brainstorm",
+        "🤝 Negotiation",
+        "🎤 Interview",
+        "📚 Storytelling",
+        "👨‍🏫 Teaching",
+        "💼 Consulting",
+        "🔙 Back to Main",
+        "🎭 New Preset",
+        "🚀 Start",
     }
-    
+
     return text in keyboard_buttons
 
 
 def get_command_from_button(button_text: str) -> Optional[str]:
     """
     Convert keyboard button text to corresponding command.
-    
+
     Args:
         button_text: The button text
-        
+
     Returns:
         Corresponding command or None
     """
     button_to_command = {
         "🚀 Start New": "/start",
-        "🎭 Presets": "/presets", 
+        "🎭 Presets": "/presets",
         "📊 Status": "/status",
         "⏸️ Pause": "/pause",
         "▶️ Resume": "/resume",
@@ -209,7 +195,7 @@ def get_command_from_button(button_text: str) -> Optional[str]:
         "ℹ️ About": "/help",
         "🔙 Back to Main": "/start",
         "🎭 New Preset": "/presets",
-        "🚀 Start": "/start"
+        "🚀 Start": "/start",
     }
-    
+
     return button_to_command.get(button_text)

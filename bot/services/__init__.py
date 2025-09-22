@@ -7,4 +7,4 @@ from the presentation layer (handlers).
 
 from ..registry import services
 
-__all__ = ['services']
+__all__ = ["services"]

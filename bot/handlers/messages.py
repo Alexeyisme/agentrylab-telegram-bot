@@ -6,9 +6,9 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from ..keyboards.reply import (
-    is_keyboard_button, 
+    is_keyboard_button,
     get_command_from_button,
-    create_main_menu_keyboard
+    create_main_menu_keyboard,
 )
 from ..states.conversation import ConversationState
 from ..utils.context_helpers import (
@@ -29,7 +29,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     message = update.message
     if not message or not message.text:
         return
-    
+
     message_text = message.text.strip()
     if is_keyboard_button(message_text):
         command = get_command_from_button(message_text)
@@ -58,11 +58,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await conversation_handlers.handle_regular_message(update, context)
 
 
-async def handle_keyboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE, command: str) -> None:
+async def handle_keyboard_command(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, command: str
+) -> None:
     """Handle commands triggered by keyboard buttons."""
     # Import command handlers
     from . import commands
-    
+
     # Route to appropriate command handler
     if command == "/start":
         await commands.start_command(update, context)

@@ -69,7 +69,9 @@ class AsyncTelegramAdapter(TelegramAdapter):
             )
 
             max_rounds = state.metadata.get("max_rounds", 10)
-            async for event in self._iterate_lab_stream(conversation_id, lab, max_rounds):
+            async for event in self._iterate_lab_stream(
+                conversation_id, lab, max_rounds
+            ):
                 if state.status != ConversationStatus.ACTIVE:
                     break
 
@@ -98,7 +100,9 @@ class AsyncTelegramAdapter(TelegramAdapter):
                 try:
                     user_msg = user_queue.get_nowait()
                     if not user_msg.processed:
-                        lab.post_user_message(user_msg.content, user_id=user_msg.user_id)
+                        lab.post_user_message(
+                            user_msg.content, user_id=user_msg.user_id
+                        )
                         user_msg.processed = True
 
                         await self._emit_event(
