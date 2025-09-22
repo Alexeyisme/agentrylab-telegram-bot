@@ -12,6 +12,7 @@ jobs:
     strategy:
       matrix:
         python-version: [3.8, 3.9, "3.10", "3.11", "3.12"]
+      fail-fast: false
 
     steps:
     - uses: actions/checkout@v4
@@ -29,10 +30,20 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pip-
     
+    - name: Check package availability
+      run: |
+        echo "Checking package availability for Python ${{ matrix.python-version }}"
+        python --version
+        pip index versions agentrylab || echo "agentrylab package not found on PyPI"
+      timeout-minutes: 2
+    
     - name: Install dependencies
       run: |
+        echo "Installing dependencies for Python ${{ matrix.python-version }}"
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install --no-cache-dir -r requirements.txt
+        echo "Dependencies installed successfully"
+      timeout-minutes: 10
     
     - name: Lint with flake8
       run: |
@@ -83,8 +94,9 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install safety bandit
+        pip install --no-cache-dir -r requirements.txt
+        pip install --no-cache-dir safety bandit
+      timeout-minutes: 10
     
     - name: Security check with safety
       run: |
