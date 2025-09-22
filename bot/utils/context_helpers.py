@@ -5,8 +5,8 @@ This module provides utilities for accessing and validating context data,
 reducing code duplication in handlers.
 """
 
-from typing import Optional, Any
-from telegram import Update
+from typing import Optional, Any, Union
+from telegram import Update, Message, User, CallbackQuery
 from telegram.ext import ContextTypes
 
 from ..constants import Messages
@@ -15,6 +15,93 @@ from ..utils.error_handling import BotNotInitializedError, UserNotActiveError, C
 
 # Global state manager instance
 state_manager = ConversationStateManager()
+
+
+def safe_get_message(update: Optional[Update]) -> Optional[Message]:
+    """Safely get message from update."""
+    return update.message if update else None
+
+
+def safe_get_user(update: Optional[Update]) -> Optional[User]:
+    """Safely get user from update."""
+    if not update:
+        return None
+    if update.message and update.message.from_user:
+        return update.message.from_user
+    if update.callback_query and update.callback_query.from_user:
+        return update.callback_query.from_user
+    return None
+
+
+def safe_get_callback_query(update: Optional[Update]) -> Optional[CallbackQuery]:
+    """Safely get callback query from update."""
+    return update.callback_query if update else None
+
+
+def safe_get_user_id(update: Optional[Update]) -> Optional[str]:
+    """Safely get user ID from update."""
+    user = safe_get_user(update)
+    return str(user.id) if user else None
+
+
+def safe_get_message_text(message: Optional[Message]) -> Optional[str]:
+    """Safely get text from message."""
+    return message.text if message else None
+
+
+def safe_get_callback_data(callback_query: Optional[CallbackQuery]) -> Optional[str]:
+    """Safely get data from callback query."""
+    return callback_query.data if callback_query else None
+
+
+async def require_adapter_from_callback(callback_query: CallbackQuery, context: Optional[ContextTypes.DEFAULT_TYPE]) -> Any:
+    """
+    Get adapter from context for callback queries.
+    
+    Args:
+        callback_query: Telegram callback query object
+        context: Bot context
+        
+    Returns:
+        TelegramAdapter instance
+        
+    Raises:
+        BotNotInitializedError: If adapter is not available
+    """
+    if context and hasattr(context, 'bot_data') and context.bot_data is not None:
+        adapter = context.bot_data.get('adapter')
+        if adapter is not None:
+            return adapter
+    
+    # Send error message to user
+    await callback_query.edit_message_text(
+        "❌ Bot is not properly initialized. Please try again later."
+    )
+    raise BotNotInitializedError("Adapter not available in context")
+
+
+def set_user_data_from_callback(callback_query: CallbackQuery, context: Optional[ContextTypes.DEFAULT_TYPE], key: str, value: Any) -> None:
+    """Set user data from callback query."""
+    user_id = safe_get_user_id(Update(update_id=0, callback_query=callback_query))
+    if user_id:
+        set_user_data(Update(update_id=0, callback_query=callback_query), context, key, value)
+
+
+def get_user_id_from_callback(callback_query: CallbackQuery) -> Optional[str]:
+    """Get user ID from callback query."""
+    return safe_get_user_id(Update(update_id=0, callback_query=callback_query))
+
+
+def set_user_waiting_for_topic_from_callback(callback_query: CallbackQuery, context: Optional[ContextTypes.DEFAULT_TYPE], waiting: bool) -> None:
+    """Set user waiting for topic from callback query."""
+    if context is None:
+        return
+    set_user_waiting_for_topic(Update(update_id=0, callback_query=callback_query), context, waiting)
+
+
+def clear_user_data_from_callback(callback_query: CallbackQuery, context: Optional[ContextTypes.DEFAULT_TYPE]) -> None:
+    """Clear user data from callback query."""
+    clear_user_data(Update(update_id=0, callback_query=callback_query), context)
 
 
 def get_adapter(context: Optional[ContextTypes.DEFAULT_TYPE]) -> Any:
@@ -56,8 +143,9 @@ async def require_adapter(update: Optional[Update], context: Optional[ContextTyp
     try:
         return get_adapter(context)
     except BotNotInitializedError:
-        if update and getattr(update, 'message', None):
-            await update.message.reply_text(Messages.BOT_NOT_INITIALIZED)
+        message = safe_get_message(update)
+        if message:
+            await message.reply_text(Messages.BOT_NOT_INITIALIZED)
         raise
 
 
@@ -101,17 +189,7 @@ def get_user_id(update: Optional[Update]) -> Optional[str]:
     Returns:
         User ID as string
     """
-    if not update:
-        return None
-
-    if getattr(update, 'effective_user', None) and update.effective_user.id is not None:
-        return str(update.effective_user.id)
-    callback_query = update.__dict__.get('callback_query') if hasattr(update, '__dict__') else None
-    if callback_query and getattr(callback_query, 'from_user', None):
-        user_id = callback_query.from_user.id
-        if user_id is not None:
-            return str(user_id)
-    return None
+    return safe_get_user_id(update)
 
 
 def get_user_state(update: Optional[Update], context: Optional[ContextTypes.DEFAULT_TYPE]) -> UserConversationState:
@@ -150,7 +228,9 @@ async def require_active_user(update: Optional[Update], context: Optional[Contex
     user_state = get_user_state(update, context)
     
     if not user_state.is_active():
-        await update.message.reply_text(Messages.NO_ACTIVE_CONVERSATION)
+        message = safe_get_message(update)
+        if message:
+            await message.reply_text(Messages.NO_ACTIVE_CONVERSATION)
         raise UserNotActiveError("User has no active conversation")
     
     return user_state
@@ -173,7 +253,9 @@ async def require_user_in_conversation(update: Optional[Update], context: Option
     user_state = get_user_state(update, context)
     
     if not user_state.is_in_conversation():
-        await update.message.reply_text(Messages.NO_ACTIVE_CONVERSATION)
+        message = safe_get_message(update)
+        if message:
+            await message.reply_text(Messages.NO_ACTIVE_CONVERSATION)
         raise UserNotActiveError("User is not in conversation")
     
     return user_state
@@ -196,7 +278,9 @@ async def require_paused_conversation(update: Optional[Update], context: Optiona
     user_state = get_user_state(update, context)
     
     if user_state.state != ConversationState.CONVERSATION_PAUSED:
-        await update.message.reply_text(Messages.NO_PAUSED_CONVERSATION)
+        message = safe_get_message(update)
+        if message:
+            await message.reply_text(Messages.NO_PAUSED_CONVERSATION)
         raise UserNotActiveError("User has no paused conversation")
     
     return user_state
@@ -241,8 +325,9 @@ async def require_conversation_id(update: Update, context: ContextTypes.DEFAULT_
     try:
         return get_conversation_id(update, context)
     except ConversationNotFoundError:
-        if update and getattr(update, 'message', None):
-            await update.message.reply_text(Messages.NO_CONVERSATION_FOUND)
+        message = safe_get_message(update)
+        if message:
+            await message.reply_text(Messages.NO_CONVERSATION_FOUND)
         raise
 
 
@@ -428,10 +513,13 @@ def get_message_text(update: Optional[Update]) -> str:
     Returns:
         Message text
     """
-    if update and getattr(update, 'message', None) and update.message.text:
-        return update.message.text.strip()
-    if update and getattr(update, 'callback_query', None) and update.callback_query.data:
-        return update.callback_query.data
+    message = safe_get_message(update)
+    if message and message.text:
+        return message.text.strip()
+    
+    callback_query = safe_get_callback_query(update)
+    if callback_query and callback_query.data:
+        return callback_query.data
     else:
         return ""
 
@@ -446,8 +534,9 @@ def get_callback_data(update: Optional[Update]) -> Optional[str]:
     Returns:
         Callback data or None
     """
-    if update and getattr(update, 'callback_query', None):
-        return update.callback_query.data
+    callback_query = safe_get_callback_query(update)
+    if callback_query:
+        return callback_query.data
     return None
 
 
@@ -474,7 +563,8 @@ def is_text_message(update: Optional[Update]) -> bool:
     Returns:
         True if update is a text message
     """
-    return bool(update and getattr(update, 'message', None) and update.message.text is not None)
+    message = safe_get_message(update)
+    return bool(message and message.text is not None)
 
 
 def get_user_info(update: Optional[Update]) -> Optional[dict]:
@@ -487,10 +577,9 @@ def get_user_info(update: Optional[Update]) -> Optional[dict]:
     Returns:
         Dictionary with user information
     """
-    if not update or not getattr(update, 'effective_user', None):
+    user = safe_get_user(update)
+    if not user:
         return None
-
-    user = update.effective_user
     return {
         'id': user.id,
         'username': getattr(user, 'username', None),

@@ -63,6 +63,9 @@ class CallbackRouter:
             Result from the appropriate handler
         """
         data = query.data
+        if not data:
+            return
+        
         logger.debug(f"Handling callback with data: {data}")
         
         # Find matching handler

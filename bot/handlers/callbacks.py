@@ -17,10 +17,20 @@ logger = logging.getLogger(__name__)
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle callback queries."""
     query = update.callback_query
+    if not query:
+        return
+    
     await query.answer()
     
     data = query.data
-    user_id = str(query.from_user.id)
+    if not data:
+        return
+    
+    user = query.from_user
+    if not user:
+        return
+    
+    user_id = str(user.id)
     
     try:
         if data.startswith(PREFIX_SELECT):

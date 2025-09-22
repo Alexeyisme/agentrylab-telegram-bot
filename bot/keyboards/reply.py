@@ -3,7 +3,7 @@ Persistent reply keyboards for the Telegram bot.
 These keyboards are always visible on screen and provide quick access to commands.
 """
 
-from telegram import ReplyKeyboardMarkup, KeyboardButton
+from telegram import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from typing import List, Optional
 
 
@@ -138,19 +138,14 @@ def create_simple_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
-def remove_keyboard() -> ReplyKeyboardMarkup:
+def remove_keyboard() -> ReplyKeyboardRemove:
     """
     Remove the persistent keyboard.
     
     Returns:
         ReplyKeyboardMarkup that removes the keyboard
     """
-    return ReplyKeyboardMarkup(
-        [[]],
-        resize_keyboard=True,
-        one_time_keyboard=True,
-        remove_keyboard=True
-    )
+    return ReplyKeyboardRemove()
 
 
 def get_keyboard_for_state(state: str) -> ReplyKeyboardMarkup:

@@ -165,7 +165,7 @@ class PresetService:
         Returns:
             Dictionary mapping categories to lists of preset IDs
         """
-        categories = {}
+        categories: Dict[str, List[str]] = {}
         
         for preset_id, info in preset_info.items():
             category = info.get('category', PresetCategories.OTHER)
@@ -334,7 +334,7 @@ class PresetService:
         avg_examples = total_examples / total_presets if total_presets > 0 else 0
         
         # Count emojis
-        emoji_counts = {}
+        emoji_counts: Dict[str, int] = {}
         for info in preset_info.values():
             emoji = info.get('emoji', '🤖')
             emoji_counts[emoji] = emoji_counts.get(emoji, 0) + 1

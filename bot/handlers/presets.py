@@ -27,8 +27,13 @@ from ..utils.context_helpers import (
     get_state_manager,
     get_user_id,
     require_adapter,
+    require_adapter_from_callback,
     set_user_data,
+    set_user_data_from_callback,
     set_user_waiting_for_topic,
+    set_user_waiting_for_topic_from_callback,
+    get_user_id_from_callback,
+    clear_user_data_from_callback,
 )
 from ..utils.error_handling import handle_errors
 
@@ -52,8 +57,12 @@ async def show_presets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     # Get available presets
     presets = await preset_service.get_available_presets()
     
+    message = update.message
+    if not message:
+        return
+    
     if not presets:
-        await update.message.reply_text(MessageTemplates.no_presets_available_message())
+        await message.reply_text(MessageTemplates.no_presets_available_message())
         return
     
     # Get preset information using service
@@ -63,18 +72,18 @@ async def show_presets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     keyboard = create_preset_selection_keyboard(presets, preset_info)
     
     # Create message using template
-    message = MessageTemplates.preset_selection_message()
+    message_text = MessageTemplates.preset_selection_message()
     
     # Add preset descriptions
     for preset_id in presets:
         info = preset_info[preset_id]
-        message += f"{info['emoji']} **{info['display_name']}**\n"
-        message += f"_{info['description']}_\n\n"
+        message_text += f"{info['emoji']} **{info['display_name']}**\n"
+        message_text += f"_{info['description']}_\n\n"
     
-    message += "Click on a preset below to get started!"
+    message_text += "Click on a preset below to get started!"
     
-    await update.message.reply_text(
-        message,
+    await message.reply_text(
+        message_text,
         parse_mode='Markdown',
         reply_markup=keyboard
     )
@@ -95,10 +104,15 @@ async def handle_preset_callback(update: Update, context: ContextTypes.DEFAULT_T
         context: Bot context
     """
     query = update.callback_query
+    if not query:
+        return
+    
     await query.answer()
     
     try:
         data = query.data
+        if not data:
+            return
         
         if data.startswith("preset_"):
             # Show preset information
@@ -166,7 +180,7 @@ async def show_preset_info(query: CallbackQuery, context: ContextTypes.DEFAULT_T
         preset_id: The preset ID
     """
     # Get adapter using new utility
-    adapter = await require_adapter(query, context)
+    adapter = await require_adapter_from_callback(query, context)
     
     # Create preset service
     preset_service = PresetService(adapter)
@@ -203,7 +217,7 @@ async def show_preset_examples(query: CallbackQuery, context: ContextTypes.DEFAU
         preset_id: The preset ID
     """
     # Get adapter using new utility
-    adapter = await require_adapter(query, context)
+    adapter = await require_adapter_from_callback(query, context)
     
     # Create preset service
     preset_service = PresetService(adapter)
@@ -239,7 +253,7 @@ async def use_example_topic(query: CallbackQuery, context: ContextTypes.DEFAULT_
         preset_id: The preset ID
     """
     # Get adapter using new utility
-    adapter = await require_adapter(query, context)
+    adapter = await require_adapter_from_callback(query, context)
     
     # Create preset service
     preset_service = PresetService(adapter)
@@ -268,16 +282,16 @@ async def use_example_topic(query: CallbackQuery, context: ContextTypes.DEFAULT_
     )
     
     # Store topic in context for conversation start
-    set_user_data(query, context, 'selected_preset', preset_id)
-    set_user_data(query, context, 'selected_topic', topic)
+    set_user_data_from_callback(query, context, 'selected_preset', preset_id)
+    set_user_data_from_callback(query, context, 'selected_topic', topic)
 
-    user_id = get_user_id(query)
+    user_id = get_user_id_from_callback(query)
     if user_id:
         state_manager = get_state_manager(context)
         state_manager.set_user_state(user_id, ConversationState.CONFIRMING_TOPIC)
         state_manager.set_user_preset(user_id, preset_id)
         state_manager.set_user_topic(user_id, topic)
-    set_user_waiting_for_topic(query, context, False)
+    set_user_waiting_for_topic_from_callback(query, context, False)
 
 
 @handle_errors("Error starting topic input.")
@@ -291,7 +305,7 @@ async def start_custom_topic_input(query: CallbackQuery, context: ContextTypes.D
         preset_id: The preset ID
     """
     # Get adapter using new utility
-    adapter = await require_adapter(query, context)
+    adapter = await require_adapter_from_callback(query, context)
     
     # Create preset service
     preset_service = PresetService(adapter)
@@ -312,10 +326,10 @@ async def start_custom_topic_input(query: CallbackQuery, context: ContextTypes.D
     )
     
     # Set state for topic input
-    set_user_data(query, context, 'selected_preset', preset_id)
-    set_user_waiting_for_topic(query, context, True)
+    set_user_data_from_callback(query, context, 'selected_preset', preset_id)
+    set_user_waiting_for_topic_from_callback(query, context, True)
 
-    user_id = get_user_id(query)
+    user_id = get_user_id_from_callback(query)
     if user_id:
         state_manager = get_state_manager(context)
         state_manager.set_user_preset(user_id, preset_id)
@@ -333,13 +347,16 @@ async def start_conversation(query: CallbackQuery, context: ContextTypes.DEFAULT
         preset_id: The preset ID
     """
     # Get topic from context
+    if not context or not context.user_data:
+        return
+    
     topic = context.user_data.get('selected_topic')
     if not topic:
         await query.edit_message_text(Messages.NO_TOPIC_SELECTED)
         return
     
     # Get adapter using new utility (also validates bot initialization)
-    adapter = await require_adapter(query, context)
+    adapter = await require_adapter_from_callback(query, context)
 
     # Create preset service to populate display text
     preset_service = PresetService(adapter)
@@ -368,8 +385,8 @@ async def start_conversation(query: CallbackQuery, context: ContextTypes.DEFAULT
         topic,
     )
 
-    set_user_waiting_for_topic(query, context, False)
-    clear_user_data(query, context, 'waiting_for_topic', 'selected_preset', 'selected_topic')
+    set_user_waiting_for_topic_from_callback(query, context, False)
+    clear_user_data_from_callback(query, context)
 
 
 @handle_errors("Error retrieving presets. Please try again later.")
@@ -382,7 +399,7 @@ async def show_presets_callback(query: CallbackQuery, context: ContextTypes.DEFA
         context: Bot context
     """
     # Get adapter using new utility
-    adapter = await require_adapter(query, context)
+    adapter = await require_adapter_from_callback(query, context)
     
     # Create preset service
     preset_service = PresetService(adapter)

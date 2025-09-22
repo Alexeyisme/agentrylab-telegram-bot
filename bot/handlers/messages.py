@@ -26,7 +26,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     # Check if it's a keyboard button press first
-    message_text = update.message.text.strip()
+    message = update.message
+    if not message or not message.text:
+        return
+    
+    message_text = message.text.strip()
     if is_keyboard_button(message_text):
         command = get_command_from_button(message_text)
         if command:

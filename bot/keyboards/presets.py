@@ -20,8 +20,8 @@ def create_preset_selection_keyboard(presets: List[str], preset_info: Dict[str, 
     keyboard = []
     
     # Group presets by category if available
-    categories = {}
-    uncategorized = []
+    categories: Dict[str, List[str]] = {}
+    uncategorized: List[str] = []
     
     for preset_id in presets:
         info = preset_info.get(preset_id, {})
@@ -29,7 +29,7 @@ def create_preset_selection_keyboard(presets: List[str], preset_info: Dict[str, 
         
         if category not in categories:
             categories[category] = []
-        categories[category].append((preset_id, info))
+        categories[category].append(preset_id)
     
     # Create keyboard rows
     for category, preset_list in categories.items():
@@ -42,7 +42,8 @@ def create_preset_selection_keyboard(presets: List[str], preset_info: Dict[str, 
             row = []
             for j in range(2):
                 if i + j < len(preset_list):
-                    preset_id, info = preset_list[i + j]
+                    preset_id = preset_list[i + j]
+                    info = preset_info.get(preset_id, {})
                     emoji = info.get('emoji', '🤖')
                     display_name = info.get('display_name', preset_id.replace('_', ' ').title())
                     button_text = f"{emoji} {display_name}"

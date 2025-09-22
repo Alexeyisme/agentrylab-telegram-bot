@@ -25,6 +25,7 @@ from ..utils.context_helpers import (
     get_selected_preset,
     get_selected_topic,
     get_state_manager,
+    safe_get_message,
 )
 from ..utils.error_handling import handle_errors
 from ..utils.validation import validate_topic_input
@@ -41,8 +42,15 @@ async def handle_topic_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context: Bot context
     """
     user_id = get_user_id(update)
+    if not user_id:
+        return
+    
     state_manager = get_state_manager(context)
-    message_text = update.message.text.strip()
+    message = safe_get_message(update)
+    if not message or not message.text:
+        return
+    
+    message_text = message.text.strip()
     
     # Check if user is waiting for topic input using new utility
     user_state = state_manager.get_user_state(user_id)
@@ -62,7 +70,7 @@ async def handle_topic_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     validation_result = validate_topic_input(message_text)
     if not validation_result['valid']:
         error_message = MessageTemplates.topic_validation_error(validation_result.get('error_type', 'general'))
-        await update.message.reply_text(
+        await message.reply_text(
             f"❌ {error_message}\n\n"
             "Please enter a valid topic. For example:\n"
             "• Should remote work become the standard?\n"
@@ -74,7 +82,7 @@ async def handle_topic_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # Get selected preset using new utility
     preset_id = get_selected_preset(update, context)
     if not preset_id:
-        await update.message.reply_text(Messages.NO_PRESET_SELECTED)
+        await message.reply_text(Messages.NO_PRESET_SELECTED)
         return
     
     # Store topic using new utility
@@ -89,7 +97,7 @@ async def handle_topic_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     preset_info = await preset_service.get_preset_info(preset_id)
     
     # Create confirmation message using template
-    message = MessageTemplates.topic_confirmation_message(
+    confirmation_message = MessageTemplates.topic_confirmation_message(
         emoji=preset_info['emoji'],
         display_name=preset_info['display_name'],
         topic=message_text
@@ -97,8 +105,8 @@ async def handle_topic_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     keyboard = create_topic_confirmation_keyboard(preset_id, message_text)
     
-    await update.message.reply_text(
-        message,
+    await message.reply_text(
+        confirmation_message,
         parse_mode='Markdown',
         reply_markup=keyboard
     )
@@ -122,7 +130,13 @@ async def handle_regular_message(update: Update, context: ContextTypes.DEFAULT_T
         context: Bot context
     """
     user_id = get_user_id(update)
+    if not user_id:
+        return
+    
     state_manager = get_state_manager(context)
+    message = safe_get_message(update)
+    if not message:
+        return
 
     # Check if user is in a conversation
     if state_manager.is_user_in_conversation(user_id):
@@ -131,7 +145,7 @@ async def handle_regular_message(update: Update, context: ContextTypes.DEFAULT_T
         return
     
     # User is not in conversation, provide help using template
-    await update.message.reply_text(
+    await message.reply_text(
         MessageTemplates.regular_message_response(),
         parse_mode='Markdown',
         reply_markup=create_main_menu_keyboard()
@@ -148,15 +162,22 @@ async def handle_conversation_input(update: Update, context: ContextTypes.DEFAUL
         context: Bot context
     """
     user_id = get_user_id(update)
+    if not user_id:
+        return
+    
     state_manager = get_state_manager(context)
-    message_text = update.message.text.strip()
+    message = safe_get_message(update)
+    if not message or not message.text:
+        return
+    
+    message_text = message.text.strip()
     
     # Get user state
     user_state = state_manager.get_user_state(user_id)
     
     # Check if user is waiting for input
     if user_state.state != ConversationState.WAITING_FOR_USER_INPUT:
-        await update.message.reply_text(
+        await message.reply_text(
             MessageTemplates.waiting_for_turn_message(),
             parse_mode='Markdown'
         )
@@ -165,7 +186,7 @@ async def handle_conversation_input(update: Update, context: ContextTypes.DEFAUL
     # Get conversation ID
     conversation_id = user_state.conversation_id
     if not conversation_id:
-        await update.message.reply_text(Messages.NO_CONVERSATION_FOUND)
+        await message.reply_text(Messages.NO_CONVERSATION_FOUND)
         return
     
     # Get adapter and create conversation service
@@ -179,19 +200,19 @@ async def handle_conversation_input(update: Update, context: ContextTypes.DEFAUL
         
         if success:
             # Show confirmation using template
-            await update.message.reply_text(
+            await message.reply_text(
                 MessageTemplates.message_sent_message(),
                 parse_mode='Markdown'
             )
         else:
-            await update.message.reply_text(
+            await message.reply_text(
                 MessageTemplates.waiting_for_turn_message(),
                 parse_mode='Markdown'
             )
             
     except Exception as e:
         logger.error(f"Error posting user message: {e}")
-        await update.message.reply_text(
+        await message.reply_text(
             "❌ Error sending your message. Please try again."
         )
 
@@ -220,6 +241,9 @@ async def start_conversation_with_agentrylab(update: Update, context: ContextTyp
     conversation_service = ConversationService(adapter, state_manager)
     
     # Start conversation using service
+    if not user_id:
+        return None
+    
     conversation_id = await conversation_service.start_conversation(
         user_id=user_id,
         preset_id=preset_id,
@@ -253,22 +277,24 @@ async def stream_conversation_events(update: Update, context: ContextTypes.DEFAU
         conversation_service = ConversationService(adapter, state_manager)
         
         # Define event handler
-        async def handle_event(event_type: str, content: str, agent_id: str = None, role: str = None):
+        async def handle_event(event_type: str, content: str, agent_id: Optional[str] = None, role: Optional[str] = None):
             # Format message based on event type using templates
             if event_type == "conversation_started":
                 message = MessageTemplates.conversation_started_message()
             elif event_type == "agent_message":
-                message = MessageTemplates.agent_message(role, content, agent_id)
+                message = MessageTemplates.agent_message(role or "agent", content, agent_id)
             elif event_type == "user_message":
                 message = MessageTemplates.agent_message("user", content, agent_id)
             elif event_type == "user_turn":
                 message = MessageTemplates.user_turn_message()
                 # Update user state to waiting for input
-                state_manager.set_user_state(user_id, ConversationState.WAITING_FOR_USER_INPUT)
+                if user_id:
+                    state_manager.set_user_state(user_id, ConversationState.WAITING_FOR_USER_INPUT)
             elif event_type == "conversation_completed":
                 message = MessageTemplates.conversation_completed_message()
                 # Update user state
-                state_manager.set_user_state(user_id, ConversationState.CONVERSATION_ENDED)
+                if user_id:
+                    state_manager.set_user_state(user_id, ConversationState.CONVERSATION_ENDED)
             elif event_type == "error":
                 if content and "401" in content:
                     message = (
@@ -277,7 +303,8 @@ async def stream_conversation_events(update: Update, context: ContextTypes.DEFAU
                     )
                 else:
                     message = f"❌ **Error:** {content}"
-                state_manager.set_user_state(user_id, ConversationState.ERROR)
+                if user_id:
+                    state_manager.set_user_state(user_id, ConversationState.ERROR)
             else:
                 # Unknown event type, just show content when available
                 message = f"📢 {content}" if content else ""
@@ -286,28 +313,38 @@ async def stream_conversation_events(update: Update, context: ContextTypes.DEFAU
             if not message:
                 return
 
+            # Get the message object from update
+            message_obj = safe_get_message(update)
+            if not message_obj:
+                return
+
             try:
-                await update.message.reply_text(message, parse_mode='Markdown')
+                await message_obj.reply_text(message, parse_mode='Markdown')
             except Exception as e:
                 logger.error(f"Error sending event message: {e}")
                 # Try sending without markdown
                 try:
-                    await update.message.reply_text(message)
+                    await message_obj.reply_text(message)
                 except Exception as e2:
                     logger.error(f"Error sending plain text message: {e2}")
         
         # Start conversation streaming using service
+        if not user_id:
+            return
         await conversation_service.start_conversation_streaming(user_id, handle_event)
         
     except Exception as e:
         logger.error(f"Error streaming conversation events: {e}")
-        state_manager.set_user_state(user_id, ConversationState.ERROR)
+        if user_id:
+            state_manager.set_user_state(user_id, ConversationState.ERROR)
         
         try:
-            await update.message.reply_text(
-                MessageTemplates.connection_error_message(),
-                parse_mode='Markdown'
-            )
+            message_obj = safe_get_message(update)
+            if message_obj:
+                await message_obj.reply_text(
+                    MessageTemplates.connection_error_message(),
+                    parse_mode='Markdown'
+                )
         except Exception as e2:
             logger.error(f"Error sending error message: {e2}")
 
@@ -322,15 +359,21 @@ async def pause_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context: Bot context
     """
     user_id = get_user_id(update)
+    if not user_id:
+        return
+    
     state_manager = get_state_manager(context)
+    message = safe_get_message(update)
+    if not message:
+        return
 
     # Check if user is in conversation
     user_state = state_manager.get_user_state(user_id)
     if not user_state.is_in_conversation():
-        await update.message.reply_text(Messages.NO_CONVERSATION_TO_PAUSE)
+        await message.reply_text(Messages.NO_CONVERSATION_TO_PAUSE)
         return
     if not user_state.conversation_id:
-        await update.message.reply_text(Messages.NO_CONVERSATION_TO_PAUSE)
+        await message.reply_text(Messages.NO_CONVERSATION_TO_PAUSE)
         return
     
     # Get adapter and create conversation service
@@ -339,10 +382,12 @@ async def pause_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE)
     conversation_service = ConversationService(adapter, state_manager)
     
     # Pause conversation using service
+    if not user_id:
+        return
     await conversation_service.pause_conversation(user_id)
     
     # Show confirmation using template
-    await update.message.reply_text(
+    await message.reply_text(
         MessageTemplates.conversation_paused_message(),
         parse_mode='Markdown'
     )
@@ -358,15 +403,21 @@ async def resume_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE
         context: Bot context
     """
     user_id = get_user_id(update)
+    if not user_id:
+        return
+    
     state_manager = get_state_manager(context)
+    message = safe_get_message(update)
+    if not message:
+        return
 
     # Check if user has a paused conversation
     user_state = state_manager.get_user_state(user_id)
     if user_state.state != ConversationState.CONVERSATION_PAUSED:
-        await update.message.reply_text(Messages.NO_PAUSED_CONVERSATION)
+        await message.reply_text(Messages.NO_PAUSED_CONVERSATION)
         return
     if not user_state.conversation_id:
-        await update.message.reply_text(Messages.NO_PAUSED_CONVERSATION)
+        await message.reply_text(Messages.NO_PAUSED_CONVERSATION)
         return
     
     # Get adapter and create conversation service
@@ -375,10 +426,12 @@ async def resume_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE
     conversation_service = ConversationService(adapter, state_manager)
     
     # Resume conversation using service
+    if not user_id:
+        return
     await conversation_service.resume_conversation(user_id)
     
     # Show confirmation using template
-    await update.message.reply_text(
+    await message.reply_text(
         MessageTemplates.conversation_resumed_message(),
         parse_mode='Markdown'
     )
@@ -394,15 +447,21 @@ async def stop_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         context: Bot context
     """
     user_id = get_user_id(update)
+    if not user_id:
+        return
+    
     state_manager = get_state_manager(context)
+    message = safe_get_message(update)
+    if not message:
+        return
 
     # Check if user is in conversation
     user_state = state_manager.get_user_state(user_id)
     if not user_state.is_in_conversation():
-        await update.message.reply_text(Messages.NO_CONVERSATION_TO_STOP)
+        await message.reply_text(Messages.NO_CONVERSATION_TO_STOP)
         return
     if not user_state.conversation_id:
-        await update.message.reply_text(Messages.NO_CONVERSATION_TO_STOP)
+        await message.reply_text(Messages.NO_CONVERSATION_TO_STOP)
         return
     
     # Get adapter and create conversation service
@@ -411,10 +470,12 @@ async def stop_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     conversation_service = ConversationService(adapter, state_manager)
     
     # Stop conversation using service
+    if not user_id:
+        return
     await conversation_service.stop_conversation(user_id)
     
     # Show confirmation using template
-    await update.message.reply_text(
+    await message.reply_text(
         MessageTemplates.conversation_stopped_message(),
         parse_mode='Markdown'
     )

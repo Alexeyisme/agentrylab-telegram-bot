@@ -72,7 +72,7 @@ def validate_topic_input(topic: str) -> Dict[str, Any]:
     # Check for excessive repetition
     words = topic_stripped.split()
     if len(words) > 10:
-        word_counts = {}
+        word_counts: Dict[str, int] = {}
         for word in words:
             word_lower = word.lower()
             word_counts[word_lower] = word_counts.get(word_lower, 0) + 1

@@ -37,6 +37,9 @@ def _resolve_state_manager(context: Optional[ContextTypes.DEFAULT_TYPE]):
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start command."""
     user = update.effective_user
+    if not user:
+        return
+    
     user_id = str(user.id)
     user_name = user.first_name or user.username or "there"
 
@@ -46,7 +49,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     clear_user_data(update, context)
     set_user_waiting_for_topic(update, context, False)
 
-    await update.message.reply_text(
+    message = update.message
+    if not message:
+        return
+    
+    await message.reply_text(
         WELCOME_MSG.format(name=user_name),
         parse_mode="Markdown",
         reply_markup=create_main_menu_keyboard()
@@ -57,7 +64,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /help command."""
-    await update.message.reply_text(
+    message = update.message
+    if not message:
+        return
+    
+    await message.reply_text(
         HELP_MSG, 
         parse_mode="Markdown",
         reply_markup=create_main_menu_keyboard()
@@ -66,12 +77,20 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /status command."""
-    user_id = str(update.effective_user.id)
+    user = update.effective_user
+    if not user:
+        return
+    
+    user_id = str(user.id)
     state_manager = _resolve_state_manager(context)
     user_state = state_manager.get_user_state(user_id)
 
+    message = update.message
+    if not message:
+        return
+
     if not state_manager.is_user_active(user_id):
-        await update.message.reply_text(NO_CONVERSATION_MSG)
+        await message.reply_text(NO_CONVERSATION_MSG)
         return
 
     state_value = (
@@ -90,7 +109,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if user_state.conversation_id:
         lines.append(f"**Conversation ID:** {user_state.conversation_id}")
 
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+    await message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
 async def presets_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -99,7 +118,11 @@ async def presets_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await preset_handlers.show_presets(update, context)
     except Exception as exc:  # pragma: no cover - network/adapter failures
         logger.error("Error retrieving presets: %s", exc)
-        await update.message.reply_text("❌ Error retrieving presets. Please try again.")
+        message = update.message
+        if not message:
+            return
+        
+        await message.reply_text("❌ Error retrieving presets. Please try again.")
 
 
 async def pause_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

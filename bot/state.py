@@ -20,7 +20,7 @@ class UserState:
     conversation_id: Optional[str] = None
     preset_id: Optional[str] = None
     topic: Optional[str] = None
-    last_activity: datetime = None
+    last_activity: Optional[datetime] = None
     
     def __post_init__(self):
         if self.last_activity is None:
