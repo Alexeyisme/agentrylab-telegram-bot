@@ -71,8 +71,10 @@ def main() -> None:
         application.run_polling()
     else:
         logger.info(f"Starting bot in webhook mode on {WEBHOOK_URL}")
+        # Use localhost for webhook binding in production
+        # This is safe as webhooks are typically behind a reverse proxy
         application.run_webhook(
-            listen="0.0.0.0", port=WEBHOOK_PORT, webhook_url=WEBHOOK_URL
+            listen="127.0.0.1", port=WEBHOOK_PORT, webhook_url=WEBHOOK_URL  # nosec B104
         )
 
 
